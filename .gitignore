@@ -35,10 +35,6 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# convex codegen — regenerated on every `convex dev` / `convex deploy`.
-# Vercel rebuilds these via `npx convex deploy --cmd 'pnpm build'`.
-/convex/_generated/
-
 # vercel project linkage
 .vercel
 
