@@ -6,6 +6,7 @@ import {
 
 const isSignInRoute = createRouteMatcher(["/sign-in"])
 const isAuthApiRoute = createRouteMatcher(["/api/auth(.*)"])
+const isPublicRoute = createRouteMatcher(["/"])
 
 export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
   if (isAuthApiRoute(request)) return
@@ -17,6 +18,8 @@ export default convexAuthNextjsMiddleware(async (request, { convexAuth }) => {
       ? nextjsMiddlewareRedirect(request, "/teams")
       : undefined
   }
+
+  if (isPublicRoute(request)) return
 
   if (!isAuthenticated) {
     return nextjsMiddlewareRedirect(request, "/sign-in")
