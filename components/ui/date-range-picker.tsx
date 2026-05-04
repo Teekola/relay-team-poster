@@ -71,7 +71,10 @@ export function DateRangePicker({
           </Button>
         }
       />
-      <PopoverContent align="start" className="w-auto p-0">
+      <PopoverContent
+        align="start"
+        className="max-h-(--available-height) w-auto overflow-y-auto p-0"
+      >
         <Calendar
           mode="range"
           selected={value}
