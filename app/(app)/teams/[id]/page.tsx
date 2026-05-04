@@ -4,40 +4,25 @@ import { useMutation, useQuery } from "convex/react"
 import type Konva from "konva"
 import { notFound, useParams, useRouter } from "next/navigation"
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
+import { FormActions } from "@/components/forms/form-actions"
+import { PageHeader } from "@/components/layout/page-header"
 import { ExportButton } from "@/components/team-image/export-button"
 import {
   ResponsiveTeamImageStage,
   TeamImageStagePlaceholder,
 } from "@/components/team-image/team-image-stage"
 import { DeleteTeamImageButton } from "@/components/teams/delete-team-image-button"
+import { LayoutRadioGroup } from "@/components/teams/layout-radio-group"
 import { RosterPicker } from "@/components/teams/roster-picker"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
+import { TemplateSelect } from "@/components/teams/template-select"
+import { TextSlotField } from "@/components/teams/text-slot-field"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Skeleton } from "@/components/ui/skeleton"
-import { Spinner } from "@/components/ui/spinner"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { useHydrated } from "@/hooks/use-hydrated"
 import { LAYOUT_IDS, LAYOUTS, type LayoutId } from "@/lib/layouts"
-import { cn } from "@/lib/utils"
 import { fi } from "@/messages/fi"
 
 const LAYOUT_ID_SET: ReadonlySet<string> = new Set<string>(LAYOUT_IDS)
@@ -47,24 +32,17 @@ function isLayoutId(value: string): value is LayoutId {
 }
 
 const STAGE_DISPLAY_WIDTH = 540
-// Default aspect for the canvas placeholder before the layout is known —
-// matches the most common layout (square 3000×3000).
 const STAGE_PLACEHOLDER_ASPECT = 1
 
-// Placeholder text slot definitions used until the actual layout has loaded.
-// Every layout in the system has exactly two text slots (event + team), so
-// rendering these during loading keeps the form's vertical rhythm stable.
-// The labels may shift slightly after load (e.g. "Joukkueteksti" →
-// "Joukkueen nimi") but height and field count don't.
+// Rendered while the real layout is still loading so the form's field count
+// and vertical rhythm stay stable. Labels may shift after load; height won't.
 const PLACEHOLDER_TEXT_SLOTS = [
   { key: "_loading_event", label: "Tapahtuman nimi", defaultValue: "" },
   { key: "_loading_team", label: "Joukkueteksti", defaultValue: "" },
 ] as const
 
-// Canonical display order for text slots — rendered in the same order
-// regardless of which layout the user picks. Layout files declare slots in
-// layout-specific order (which controls Konva positioning) but the form
-// shouldn't reshuffle when the user switches layouts.
+// Form-display order is intentionally decoupled from layout slot order
+// (which controls Konva positioning) so switching layout doesn't reshuffle.
 const TEXT_SLOT_PRIORITY: Record<string, number> = {
   eventName: 0,
   teamLabel: 1,
@@ -145,8 +123,7 @@ export default function EditTeamImagePage() {
     setHasInitialized(true)
   }, [teamImage, hasInitialized])
 
-  function handleLayoutChange(value: string) {
-    if (!isLayoutId(value)) return
+  function handleLayoutChange(value: LayoutId) {
     if (value === layoutId) return
     const nextLayout = LAYOUTS[value]
     setLayoutId(value)
@@ -208,10 +185,22 @@ export default function EditTeamImagePage() {
   const canSave =
     isDirty && rosterComplete && templateId !== null && nameNonEmpty
 
-  // Page-level loading: data hasn't seeded local state yet.
+  const orderedSlots = useMemo(
+    () =>
+      layout
+        ? [...layout.textSlots].sort(compareTextSlots)
+        : PLACEHOLDER_TEXT_SLOTS,
+    [layout]
+  )
+  const eventSlot = orderedSlots.find(
+    (s) => s.key === "eventName" || s.key === "_loading_event"
+  )
+  const otherSlots = orderedSlots.filter(
+    (s) => s.key !== "eventName" && s.key !== "_loading_event"
+  )
+
   const hydrated = useHydrated()
   const isLoading = !hydrated || !hasInitialized
-  // Hard-error case: layoutId from the record isn't recognised.
   const layoutUnknown =
     teamImage !== undefined &&
     teamImage !== null &&
@@ -268,69 +257,46 @@ export default function EditTeamImagePage() {
     }
   }
 
+  async function handleDuplicate() {
+    setIsDuplicating(true)
+    try {
+      const newId = await duplicateTeamImage({ id: teamImageId })
+      router.push(`/teams/${newId}`)
+    } finally {
+      setIsDuplicating(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/teams">{fi.teams.title}</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage
-              className={cn(
-                "wrap-anywhere",
-                isLoading && "h-lh w-14 animate-pulse rounded-md bg-muted"
-              )}
+      <PageHeader
+        parent={{ href: "/teams", label: fi.teams.title }}
+        current={name || teamImage?.name || ""}
+        isLoading={isLoading}
+        titleSuffix={
+          layout && (
+            <span className="text-muted-foreground text-sm">
+              {fi.layouts[layout.id]}
+            </span>
+          )
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={handleDuplicate}
+              disabled={isDuplicating || isLoading}
             >
-              {teamImage?.name ?? ""}
-            </BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          {isLoading ? (
-            <Skeleton className="h-8 w-56 rounded-md" />
-          ) : (
-            <>
-              <h1 className="font-medium text-2xl">
-                {name || teamImage?.name}
-              </h1>
-              {layout && (
-                <span className="text-muted-foreground text-sm">
-                  {fi.layouts[layout.id]}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={async () => {
-              setIsDuplicating(true)
-              try {
-                const newId = await duplicateTeamImage({
-                  id: teamImageId,
-                })
-                router.push(`/teams/${newId}`)
-              } finally {
-                setIsDuplicating(false)
-              }
-            }}
-            disabled={isDuplicating || isLoading}
-          >
-            {fi.teams.actions.duplicate}
-          </Button>
-          <DeleteTeamImageButton
-            teamImageId={teamImageId}
-            teamImageName={teamImage?.name ?? ""}
-            isLoading={isLoading}
-          />
-        </div>
-      </header>
+              {fi.teams.actions.duplicate}
+            </Button>
+            <DeleteTeamImageButton
+              teamImageId={teamImageId}
+              teamImageName={teamImage?.name ?? ""}
+              isLoading={isLoading}
+            />
+          </>
+        }
+      />
 
       {layoutUnknown && (
         <p className="text-destructive">
@@ -341,57 +307,20 @@ export default function EditTeamImagePage() {
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <FieldGroup>
-            {(() => {
-              const slots = layout
-                ? [...layout.textSlots].sort(compareTextSlots)
-                : PLACEHOLDER_TEXT_SLOTS
-              const eventSlot = slots.find(
-                (s) => s.key === "eventName" || s.key === "_loading_event"
-              )
-              if (!eventSlot) return null
-              return (
-                <Field key={eventSlot.key}>
-                  <FieldLabel htmlFor={`text-${eventSlot.key}`}>
-                    {eventSlot.label}
-                  </FieldLabel>
-                  <Input
-                    id={`text-${eventSlot.key}`}
-                    value={
-                      textValues[eventSlot.key] ?? eventSlot.defaultValue ?? ""
-                    }
-                    onChange={(event) =>
-                      setTextValues((prev) => ({
-                        ...prev,
-                        [eventSlot.key]: event.target.value,
-                      }))
-                    }
-                    isLoading={isLoading}
-                  />
-                </Field>
-              )
-            })()}
-
-            <Field>
-              <FieldLabel>{fi.teams.fields.layout}</FieldLabel>
-              <RadioGroup
-                value={layoutId ?? ""}
-                onValueChange={(value) => {
-                  if (typeof value === "string") handleLayoutChange(value)
-                }}
-                className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+            {eventSlot && (
+              <TextSlotField
+                slot={eventSlot}
+                values={textValues}
+                setValues={setTextValues}
                 isLoading={isLoading}
-              >
-                {LAYOUT_IDS.map((id) => (
-                  <Label
-                    key={id}
-                    className="flex cursor-pointer items-center gap-2 font-normal text-sm"
-                  >
-                    <RadioGroupItem value={id} />
-                    {fi.layouts[id]}
-                  </Label>
-                ))}
-              </RadioGroup>
-            </Field>
+              />
+            )}
+
+            <LayoutRadioGroup
+              value={layoutId}
+              onChange={handleLayoutChange}
+              isLoading={isLoading}
+            />
 
             <Field>
               <FieldLabel htmlFor="team-image-name">
@@ -405,74 +334,21 @@ export default function EditTeamImagePage() {
               />
             </Field>
 
-            <Field>
-              <FieldLabel>{fi.teams.fields.template}</FieldLabel>
-              <Select
-                value={templateId}
-                disabled={
-                  isLoading || templates === undefined || templates.length === 0
-                }
-                onValueChange={(value) =>
-                  setTemplateId(value as Id<"templates"> | null)
-                }
-              >
-                <SelectTrigger isLoading={isLoading} className="w-full">
-                  <SelectValue
-                    placeholder={
-                      templates === undefined
-                        ? fi.common.loading
-                        : templates.length === 0
-                          ? fi.templates.empty
-                          : fi.teams.fields.template
-                    }
-                  >
-                    {(value) =>
-                      templates?.find((t) => t._id === value)?.name ?? null
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(templates ?? []).map((template) => (
-                    <SelectItem key={template._id} value={template._id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            <TemplateSelect
+              templates={templates}
+              value={templateId}
+              onChange={setTemplateId}
+              isLoading={isLoading}
+            />
 
-            {/* Every layout has exactly two text slots (event +
-                team). The event slot is rendered at the top of the form;
-                the remaining (team) slot is rendered here. When loading,
-                we render real labels rather than skeletons — the actual
-                `slot.label` may shift between "Joukkueteksti" /
-                "Joukkueen nimi" depending on layout, but the field height
-                stays stable either way. */}
-            {(layout
-              ? [...layout.textSlots].sort(compareTextSlots)
-              : PLACEHOLDER_TEXT_SLOTS
-            )
-              .filter(
-                (slot) =>
-                  slot.key !== "eventName" && slot.key !== "_loading_event"
-              )
-              .map((slot) => (
-              <Field key={slot.key}>
-                <FieldLabel htmlFor={`text-${slot.key}`}>
-                  {slot.label}
-                </FieldLabel>
-                <Input
-                  id={`text-${slot.key}`}
-                  value={textValues[slot.key] ?? slot.defaultValue ?? ""}
-                  onChange={(event) =>
-                    setTextValues((prev) => ({
-                      ...prev,
-                      [slot.key]: event.target.value,
-                    }))
-                  }
-                  isLoading={isLoading}
-                />
-              </Field>
+            {otherSlots.map((slot) => (
+              <TextSlotField
+                key={slot.key}
+                slot={slot}
+                values={textValues}
+                setValues={setTextValues}
+                isLoading={isLoading}
+              />
             ))}
             <Field>
               <FieldLabel>{fi.teams.fields.roster}</FieldLabel>
@@ -486,29 +362,26 @@ export default function EditTeamImagePage() {
             </Field>
           </FieldGroup>
 
-          {error && <p className="text-destructive text-sm">{error}</p>}
-
-          <div className="flex flex-wrap gap-3">
-            <Button
-              onClick={handleSave}
-              disabled={isLoading || isSaving || !canSave}
-            >
-              {isSaving && <Spinner />}
-              {isSaving ? fi.common.saving : fi.teams.actions.save}
-            </Button>
-            <ExportButton
-              stageRef={stageRef}
-              filename={(name.trim() || teamImage?.name || "team").replace(
-                /\s+/g,
-                "_"
-              )}
-              disabled={isLoading || !selectedTemplate}
-            />
-          </div>
+          <FormActions
+            error={error}
+            isSaving={isSaving}
+            isLoading={isLoading}
+            canSave={canSave}
+            saveLabel={fi.teams.actions.save}
+            onSave={handleSave}
+            extraButtons={
+              <ExportButton
+                stageRef={stageRef}
+                filename={(name.trim() || teamImage?.name || "team").replace(
+                  /\s+/g,
+                  "_"
+                )}
+                disabled={isLoading || !selectedTemplate}
+              />
+            }
+          />
         </div>
 
-        {/* Right-align the canvas in its column so its right edge lines up
-            with the action buttons in the header above. */}
         <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
           {layout ? (
             <ResponsiveTeamImageStage

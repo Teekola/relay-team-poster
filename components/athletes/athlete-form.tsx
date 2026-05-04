@@ -6,6 +6,7 @@ import { useMutation } from "convex/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
+import { FormActions } from "@/components/forms/form-actions"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -17,7 +18,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Spinner } from "@/components/ui/spinner"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { type Crop, defaultCropForImage } from "@/lib/crop"
@@ -32,16 +32,8 @@ type Props = {
         referenceCount: number
       })
     | null
-  /**
-   * True while the parent is still fetching the athlete record. The form
-   * mounts immediately so its dimensions are stable; inputs render in a
-   * loading state and switch to the real values once data lands.
-   */
   isLoading?: boolean
-  /**
-   * Fires on every keystroke in the name field so the parent can mirror
-   * the in-progress name in the page header / breadcrumb.
-   */
+  // Lets the parent mirror the in-progress name in the header/breadcrumb.
   onNameChange?: (name: string) => void
 }
 
@@ -67,8 +59,7 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
   const [crop, setCrop] = useState<Crop | null>(athlete?.crop ?? null)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  // Default closed. Opens automatically when the user uploads a new photo
-  // (since they almost certainly want to adjust the crop right after).
+  // Auto-opens after a fresh upload — users almost always want to recrop then.
   const [isCropOpen, setIsCropOpen] = useState(false)
 
   const form = useForm<FormValues>({
@@ -89,10 +80,7 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
     onNameChange?.(watchedName)
   }, [watchedName, onNameChange])
 
-  // When the athlete record arrives (transition from undefined → object),
-  // sync the form values so the displayed inputs reflect the loaded data.
-  // Without this, RHF's defaultValues only apply at mount and the form
-  // would stay empty.
+  // RHF's defaultValues only apply at mount, so reset once data arrives.
   useEffect(() => {
     if (athlete) {
       form.reset({ name: athlete.name, gender: athlete.gender })
@@ -210,10 +198,7 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      {/* Show the notice whenever we're in an edit context — including
-             the loading state — so the form doesn't shift down when data
-             arrives. (The /new route passes athlete=null with no isLoading,
-             so the notice stays hidden there.) */}
+      {/* Shown during loading too, so the form doesn't shift when data lands. */}
       {(athlete || isLoading) && (
         <p className="-mt-3 flex items-start gap-2 text-muted-foreground text-sm">
           <HugeiconsIcon
@@ -317,14 +302,13 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
         )}
       </FieldGroup>
 
-      {error && <p className="text-destructive text-sm">{error}</p>}
-
-      <div className="flex gap-3">
-        <Button type="submit" disabled={isLoading || isSaving || !canSave}>
-          {isSaving && <Spinner />}
-          {isSaving ? fi.common.saving : fi.athletes.actions.save}
-        </Button>
-      </div>
+      <FormActions
+        error={error}
+        isSaving={isSaving}
+        isLoading={isLoading}
+        canSave={canSave}
+        saveLabel={fi.athletes.actions.save}
+      />
     </form>
   )
 }

@@ -4,7 +4,7 @@ import { useMutation } from "convex/react"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
-import { Button } from "@/components/ui/button"
+import { FormActions } from "@/components/forms/form-actions"
 import {
   Field,
   FieldDescription,
@@ -15,7 +15,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Spinner } from "@/components/ui/spinner"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { ASPECT_DIMENSIONS, ASPECTS, type Aspect } from "@/lib/layouts"
@@ -75,7 +74,6 @@ export function TemplateForm({ template, isLoading }: Props) {
     }
   }, [pendingBackground])
 
-  // Sync form values when the template record arrives.
   useEffect(() => {
     if (template) {
       form.reset({ name: template.name, aspect: template.aspect })
@@ -185,8 +183,10 @@ export function TemplateForm({ template, isLoading }: Props) {
   const previewSrc =
     pendingBackground?.blobUrl ?? template?.backgroundUrl ?? null
   const isDirty = form.formState.isDirty || pendingBackground !== null
-  const canSave = isEditing ? isDirty : isDirty && pendingBackground !== null
-  const submitDisabled = isSaving || dimensionError !== null || !canSave
+  const baseCanSave = isEditing
+    ? isDirty
+    : isDirty && pendingBackground !== null
+  const canSave = baseCanSave && dimensionError === null
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
@@ -292,14 +292,13 @@ export function TemplateForm({ template, isLoading }: Props) {
         )}
       </FieldGroup>
 
-      {error && <p className="text-destructive text-sm">{error}</p>}
-
-      <div className="flex gap-3">
-        <Button type="submit" disabled={isLoading || submitDisabled}>
-          {isSaving && <Spinner />}
-          {isSaving ? fi.common.saving : fi.templates.actions.save}
-        </Button>
-      </div>
+      <FormActions
+        error={error}
+        isSaving={isSaving}
+        isLoading={isLoading}
+        canSave={canSave}
+        saveLabel={fi.templates.actions.save}
+      />
     </form>
   )
 }

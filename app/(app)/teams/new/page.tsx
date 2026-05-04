@@ -4,40 +4,20 @@ import { useMutation, useQuery } from "convex/react"
 import type Konva from "konva"
 import { useRouter } from "next/navigation"
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
+import { FormActions } from "@/components/forms/form-actions"
+import { PageHeader } from "@/components/layout/page-header"
 import { ExportButton } from "@/components/team-image/export-button"
 import { ResponsiveTeamImageStage } from "@/components/team-image/team-image-stage"
+import { LayoutRadioGroup } from "@/components/teams/layout-radio-group"
 import { RosterPicker } from "@/components/teams/roster-picker"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Button } from "@/components/ui/button"
+import { TemplateSelect } from "@/components/teams/template-select"
+import { TextSlotField } from "@/components/teams/text-slot-field"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Spinner } from "@/components/ui/spinner"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { LAYOUT_IDS, LAYOUTS, type LayoutId } from "@/lib/layouts"
+import { LAYOUTS, type LayoutId } from "@/lib/layouts"
 import { fi } from "@/messages/fi"
-
-const LAYOUT_ID_SET: ReadonlySet<string> = new Set<string>(LAYOUT_IDS)
-
-function isLayoutId(value: string): value is LayoutId {
-  return LAYOUT_ID_SET.has(value)
-}
 
 export default function NewTeamImagePage() {
   const router = useRouter()
@@ -88,8 +68,10 @@ export default function NewTeamImagePage() {
     athleteOrder.every((id) => id !== null)
   const canSave = rosterComplete && templateId !== null
 
-  function handleLayoutChange(value: string) {
-    if (!isLayoutId(value)) return
+  const eventSlot = layout.textSlots.find((s) => s.key === "eventName")
+  const otherSlots = layout.textSlots.filter((s) => s.key !== "eventName")
+
+  function handleLayoutChange(value: LayoutId) {
     setLayoutId(value)
     setTemplateId(null)
     setAthleteOrder([])
@@ -141,103 +123,29 @@ export default function NewTeamImagePage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/teams">{fi.teams.title}</BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{fi.teams.new}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
-      <header className="flex items-center justify-between">
-        <h1 className="font-medium text-2xl">{fi.teams.new}</h1>
-      </header>
+      <PageHeader
+        parent={{ href: "/teams", label: fi.teams.title }}
+        current={fi.teams.new}
+      />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <FieldGroup>
-            {(() => {
-              const eventSlot = layout.textSlots.find(
-                (s) => s.key === "eventName"
-              )
-              if (!eventSlot) return null
-              return (
-                <Field key={eventSlot.key}>
-                  <FieldLabel htmlFor={`text-${eventSlot.key}`}>
-                    {eventSlot.label}
-                  </FieldLabel>
-                  <Input
-                    id={`text-${eventSlot.key}`}
-                    value={
-                      textValues[eventSlot.key] ?? eventSlot.defaultValue ?? ""
-                    }
-                    onChange={(event) =>
-                      setTextValues((prev) => ({
-                        ...prev,
-                        [eventSlot.key]: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
-              )
-            })()}
+            {eventSlot && (
+              <TextSlotField
+                slot={eventSlot}
+                values={textValues}
+                setValues={setTextValues}
+              />
+            )}
 
-            <Field>
-              <FieldLabel>{fi.teams.fields.layout}</FieldLabel>
-              <RadioGroup
-                value={layoutId}
-                onValueChange={(value) => {
-                  if (typeof value === "string") handleLayoutChange(value)
-                }}
-                className="grid grid-cols-2 gap-2 sm:grid-cols-3"
-              >
-                {LAYOUT_IDS.map((id) => (
-                  <Label
-                    key={id}
-                    className="flex cursor-pointer items-center gap-2 font-normal text-sm"
-                  >
-                    <RadioGroupItem value={id} />
-                    {fi.layouts[id]}
-                  </Label>
-                ))}
-              </RadioGroup>
-            </Field>
+            <LayoutRadioGroup value={layoutId} onChange={handleLayoutChange} />
 
-            <Field>
-              <FieldLabel>{fi.teams.fields.template}</FieldLabel>
-              <Select
-                value={templateId}
-                onValueChange={(value) =>
-                  setTemplateId(value as Id<"templates"> | null)
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      templates === undefined
-                        ? fi.common.loading
-                        : templates.length === 0
-                          ? fi.templates.empty
-                          : fi.teams.fields.template
-                    }
-                  >
-                    {(value) =>
-                      templates?.find((t) => t._id === value)?.name ?? null
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(templates ?? []).map((template) => (
-                    <SelectItem key={template._id} value={template._id}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+            <TemplateSelect
+              templates={templates}
+              value={templateId}
+              onChange={setTemplateId}
+            />
 
             <Field>
               <FieldLabel htmlFor="team-image-name">
@@ -250,24 +158,13 @@ export default function NewTeamImagePage() {
               />
             </Field>
 
-            {layout.textSlots
-              .filter((slot) => slot.key !== "eventName")
-              .map((slot) => (
-              <Field key={slot.key}>
-                <FieldLabel htmlFor={`text-${slot.key}`}>
-                  {slot.label}
-                </FieldLabel>
-                <Input
-                  id={`text-${slot.key}`}
-                  value={textValues[slot.key] ?? slot.defaultValue ?? ""}
-                  onChange={(event) =>
-                    setTextValues((prev) => ({
-                      ...prev,
-                      [slot.key]: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
+            {otherSlots.map((slot) => (
+              <TextSlotField
+                key={slot.key}
+                slot={slot}
+                values={textValues}
+                setValues={setTextValues}
+              />
             ))}
 
             <Field>
@@ -281,22 +178,23 @@ export default function NewTeamImagePage() {
             </Field>
           </FieldGroup>
 
-          {error && <p className="text-destructive text-sm">{error}</p>}
-
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={handleSave} disabled={isSaving || !canSave}>
-              {isSaving && <Spinner />}
-              {isSaving ? fi.common.saving : fi.teams.actions.save}
-            </Button>
-            <ExportButton
-              stageRef={stageRef}
-              filename={(name.trim() || fi.layouts[layoutId]).replace(
-                /\s+/g,
-                "_"
-              )}
-              disabled={!selectedTemplate}
-            />
-          </div>
+          <FormActions
+            error={error}
+            isSaving={isSaving}
+            canSave={canSave}
+            saveLabel={fi.teams.actions.save}
+            onSave={handleSave}
+            extraButtons={
+              <ExportButton
+                stageRef={stageRef}
+                filename={(name.trim() || fi.layouts[layoutId]).replace(
+                  /\s+/g,
+                  "_"
+                )}
+                disabled={!selectedTemplate}
+              />
+            }
+          />
         </div>
 
         <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
