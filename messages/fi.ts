@@ -12,9 +12,9 @@ export const fi = {
   },
   theme: {
     toggle: "Vaihda teema",
-    light: "Vaalea",
-    dark: "Tumma",
-    system: "Järjestelmä",
+  },
+  userMenu: {
+    label: "Käyttäjävalikko",
   },
   signIn: {
     title: "Kirjaudu sisään",

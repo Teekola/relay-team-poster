@@ -1,19 +1,18 @@
 "use client"
 
-import { useAuthActions } from "@convex-dev/auth/react"
 import { Menu01Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { useQuery } from "convex/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
+import { ModeToggle } from "@/components/mode-toggle"
+import { UserMenu } from "@/components/layout/user-menu"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { api } from "@/convex/_generated/api"
 import { cn } from "@/lib/utils"
 import { fi } from "@/messages/fi"
 
@@ -25,8 +24,6 @@ const NAV_ITEMS = [
 
 export function SiteNav() {
   const pathname = usePathname()
-  const { signOut } = useAuthActions()
-  const me = useQuery(api.users.me)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   // Close the mobile menu whenever the route changes (e.g. after the user
@@ -102,15 +99,9 @@ export function SiteNav() {
           })}
         </nav>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2 text-sm sm:ml-0 sm:gap-3">
-          {me && (
-            <span className="hidden text-muted-foreground md:inline">
-              {me.email}
-            </span>
-          )}
-          <Button variant="outline" size="sm" onClick={() => signOut()}>
-            {fi.nav.signOut}
-          </Button>
+        <div className="ml-auto flex shrink-0 items-center gap-1 text-sm sm:ml-0">
+          <ModeToggle />
+          <UserMenu />
         </div>
       </div>
     </header>
