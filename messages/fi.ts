@@ -3,6 +3,13 @@ export const fi = {
     name: "JKG",
     tagline: "Suunnistusviestien joukkuekuvat Instagramia varten",
   },
+  landing: {
+    headline: "Tee viestijoukkueen Instagram-kuvat hetkessä.",
+    subhead:
+      "Lataa urheilijoiden kuvat kerran, valitse malli ja tuota julkaisukelpoiset joukkuekuvat suunnistusviesteihin.",
+    primaryCta: "Aloita",
+    secondaryCta: "Kirjaudu sisään",
+  },
   nav: {
     teams: "Joukkuekuvat",
     athletes: "Urheilijat",
