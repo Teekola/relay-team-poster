@@ -107,11 +107,7 @@ export function Combobox({
             }}
             className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-3xl text-muted-foreground hover:text-foreground"
           >
-            <HugeiconsIcon
-              icon={Cancel01Icon}
-              className="size-4"
-              aria-hidden
-            />
+            <HugeiconsIcon icon={Cancel01Icon} className="size-4" aria-hidden />
           </button>
         )}
       </div>

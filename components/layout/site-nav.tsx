@@ -5,8 +5,8 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
-import { ModeToggle } from "@/components/mode-toggle"
 import { UserMenu } from "@/components/layout/user-menu"
+import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
 import {
   Popover,

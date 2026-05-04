@@ -6,13 +6,13 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Image as KonvaImage, Layer, Rect, Stage } from "react-konva"
 import useImage from "use-image"
 import {
-  CROP_EDITOR_STAGE_W,
   CROP_EDITOR_STAGE_H,
-  PORTRAIT_ASPECT_H,
-  PORTRAIT_ASPECT_W,
+  CROP_EDITOR_STAGE_W,
   type Crop,
   clampCrop,
   defaultCropForImage,
+  PORTRAIT_ASPECT_H,
+  PORTRAIT_ASPECT_W,
 } from "@/lib/crop"
 
 type Props = {
@@ -102,7 +102,8 @@ export function CropEditor({ imageSrc, crop, onCropChange }: Props) {
   useEffect(() => {
     if (!image || naturalW === 0 || naturalH === 0) return
     if (!stageSize) return
-    const sourceCrop = cropRef.current ?? defaultCropForImage(naturalW, naturalH)
+    const sourceCrop =
+      cropRef.current ?? defaultCropForImage(naturalW, naturalH)
     const next = clampView(
       viewFromCrop(sourceCrop, stageSize.w, stageSize.h),
       naturalW,

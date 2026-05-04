@@ -7,9 +7,7 @@ export const CropEditor = dynamic(
    {
       ssr: false,
       loading: () => (
-         <div className="flex aspect-4/5 w-full items-center justify-center rounded-lg border bg-muted text-sm">
-            Ladataan editoria…
-         </div>
+         <div className="flex aspect-4/5 w-full items-center justify-center animate-pulse rounded-lg border bg-muted text-sm"></div>
       ),
    },
 );

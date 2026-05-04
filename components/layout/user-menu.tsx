@@ -49,7 +49,11 @@ export function UserMenu() {
           }}
           className="flex items-center gap-2 rounded-lg px-2 py-2 text-left text-muted-foreground text-sm transition-colors hover:bg-muted hover:text-foreground"
         >
-          <HugeiconsIcon icon={Logout01Icon} strokeWidth={2} className="size-3.5" />
+          <HugeiconsIcon
+            icon={Logout01Icon}
+            strokeWidth={2}
+            className="size-3.5"
+          />
           {fi.nav.signOut}
         </button>
       </PopoverContent>
