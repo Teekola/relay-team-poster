@@ -5,7 +5,7 @@ import type Konva from "konva"
 import { useRouter } from "next/navigation"
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { ExportButton } from "@/components/team-image/export-button"
-import { TeamImageStage } from "@/components/team-image/team-image-stage"
+import { ResponsiveTeamImageStage } from "@/components/team-image/team-image-stage"
 import { RosterPicker } from "@/components/teams/roster-picker"
 import {
   Breadcrumb,
@@ -156,9 +156,35 @@ export default function NewTeamImagePage() {
         <h1 className="font-medium text-2xl">{fi.teams.new}</h1>
       </header>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <FieldGroup>
+            {(() => {
+              const eventSlot = layout.textSlots.find(
+                (s) => s.key === "eventName"
+              )
+              if (!eventSlot) return null
+              return (
+                <Field key={eventSlot.key}>
+                  <FieldLabel htmlFor={`text-${eventSlot.key}`}>
+                    {eventSlot.label}
+                  </FieldLabel>
+                  <Input
+                    id={`text-${eventSlot.key}`}
+                    value={
+                      textValues[eventSlot.key] ?? eventSlot.defaultValue ?? ""
+                    }
+                    onChange={(event) =>
+                      setTextValues((prev) => ({
+                        ...prev,
+                        [eventSlot.key]: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              )
+            })()}
+
             <Field>
               <FieldLabel>{fi.teams.fields.layout}</FieldLabel>
               <RadioGroup
@@ -224,7 +250,9 @@ export default function NewTeamImagePage() {
               />
             </Field>
 
-            {layout.textSlots.map((slot) => (
+            {layout.textSlots
+              .filter((slot) => slot.key !== "eventName")
+              .map((slot) => (
               <Field key={slot.key}>
                 <FieldLabel htmlFor={`text-${slot.key}`}>
                   {slot.label}
@@ -271,14 +299,14 @@ export default function NewTeamImagePage() {
           </div>
         </div>
 
-        <div className="lg:sticky lg:top-6 lg:self-start">
-          <TeamImageStage
+        <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+          <ResponsiveTeamImageStage
             stageRef={stageRef}
             layout={layout}
             backgroundUrl={selectedTemplate?.backgroundUrl ?? null}
             athletes={orderedAthletes}
             textValues={deferredTextValues}
-            displayWidth={Math.min(540, layout.canvas.w)}
+            maxWidth={540}
           />
         </div>
       </div>

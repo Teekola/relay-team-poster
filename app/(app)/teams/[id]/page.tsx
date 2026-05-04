@@ -6,7 +6,7 @@ import { notFound, useParams, useRouter } from "next/navigation"
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
 import { ExportButton } from "@/components/team-image/export-button"
 import {
-  TeamImageStage,
+  ResponsiveTeamImageStage,
   TeamImageStagePlaceholder,
 } from "@/components/team-image/team-image-stage"
 import { DeleteTeamImageButton } from "@/components/teams/delete-team-image-button"
@@ -338,9 +338,39 @@ export default function EditTeamImagePage() {
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
           <FieldGroup>
+            {(() => {
+              const slots = layout
+                ? [...layout.textSlots].sort(compareTextSlots)
+                : PLACEHOLDER_TEXT_SLOTS
+              const eventSlot = slots.find(
+                (s) => s.key === "eventName" || s.key === "_loading_event"
+              )
+              if (!eventSlot) return null
+              return (
+                <Field key={eventSlot.key}>
+                  <FieldLabel htmlFor={`text-${eventSlot.key}`}>
+                    {eventSlot.label}
+                  </FieldLabel>
+                  <Input
+                    id={`text-${eventSlot.key}`}
+                    value={
+                      textValues[eventSlot.key] ?? eventSlot.defaultValue ?? ""
+                    }
+                    onChange={(event) =>
+                      setTextValues((prev) => ({
+                        ...prev,
+                        [eventSlot.key]: event.target.value,
+                      }))
+                    }
+                    isLoading={isLoading}
+                  />
+                </Field>
+              )
+            })()}
+
             <Field>
               <FieldLabel>{fi.teams.fields.layout}</FieldLabel>
               <RadioGroup
@@ -412,14 +442,21 @@ export default function EditTeamImagePage() {
             </Field>
 
             {/* Every layout has exactly two text slots (event +
-                team). When loading, render real labels rather than
-                skeletons — the actual `slot.label` may shift between
-                "Joukkueteksti" / "Joukkueen nimi" depending on layout, but
-                the field height stays stable either way. */}
+                team). The event slot is rendered at the top of the form;
+                the remaining (team) slot is rendered here. When loading,
+                we render real labels rather than skeletons — the actual
+                `slot.label` may shift between "Joukkueteksti" /
+                "Joukkueen nimi" depending on layout, but the field height
+                stays stable either way. */}
             {(layout
               ? [...layout.textSlots].sort(compareTextSlots)
               : PLACEHOLDER_TEXT_SLOTS
-            ).map((slot) => (
+            )
+              .filter(
+                (slot) =>
+                  slot.key !== "eventName" && slot.key !== "_loading_event"
+              )
+              .map((slot) => (
               <Field key={slot.key}>
                 <FieldLabel htmlFor={`text-${slot.key}`}>
                   {slot.label}
@@ -472,15 +509,15 @@ export default function EditTeamImagePage() {
 
         {/* Right-align the canvas in its column so its right edge lines up
             with the action buttons in the header above. */}
-        <div className="lg:sticky lg:top-6 lg:ml-auto lg:self-start">
+        <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
           {layout ? (
-            <TeamImageStage
+            <ResponsiveTeamImageStage
               stageRef={stageRef}
               layout={layout}
               backgroundUrl={selectedTemplate?.backgroundUrl ?? null}
               athletes={orderedAthletes}
               textValues={deferredTextValues}
-              displayWidth={Math.min(STAGE_DISPLAY_WIDTH, layout.canvas.w)}
+              maxWidth={STAGE_DISPLAY_WIDTH}
             />
           ) : (
             <TeamImageStagePlaceholder
