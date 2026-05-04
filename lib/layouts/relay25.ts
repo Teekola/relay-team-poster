@@ -46,7 +46,9 @@ function athleteSlot(legIndex: number) {
     w: PORTRAIT_W,
     h: PORTRAIT_H,
 
-    numberX: x + 8,
+    // Anchored to the left edge of the portrait so two-digit numbers
+    // ("10.", "25.") don't reach into the centered name area.
+    numberX: x - 16,
     numberY: y + NUMBER_OFFSET_Y,
     numberFontSize: NUMBER_FONT_SIZE,
 

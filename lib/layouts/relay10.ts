@@ -39,7 +39,9 @@ function athleteSlot(rowIndex: 0 | 1 | 2, columnIndex: number) {
     w: PORTRAIT_W,
     h: PORTRAIT_H,
 
-    numberX: x + 8,
+    // Anchored to the left edge of the portrait so the two-digit "10."
+    // doesn't reach into the centered name area below.
+    numberX: x - 24,
     numberY: y + NUMBER_OFFSET_Y,
     numberFontSize: NUMBER_FONT_SIZE,
 
