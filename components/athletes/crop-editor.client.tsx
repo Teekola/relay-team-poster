@@ -6,8 +6,10 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { Image as KonvaImage, Layer, Rect, Stage } from "react-konva"
 import useImage from "use-image"
 import {
-  CROP_EDITOR_STAGE_H,
   CROP_EDITOR_STAGE_W,
+  CROP_EDITOR_STAGE_H,
+  PORTRAIT_ASPECT_H,
+  PORTRAIT_ASPECT_W,
   type Crop,
   clampCrop,
   defaultCropForImage,
@@ -22,6 +24,8 @@ type Props = {
 const ZOOM_STEP = 1.08
 const MAX_SCALE = 8
 
+type StageSize = { w: number; h: number }
+
 /**
  * Internal "view" representation: where the image sits on the editor stage.
  * imgScale × natural dimensions = displayed dimensions.
@@ -29,13 +33,7 @@ const MAX_SCALE = 8
  */
 type View = { x: number; y: number; scale: number }
 
-function viewFromCrop(
-  crop: Crop,
-  _naturalW: number,
-  _naturalH: number,
-  stageW = CROP_EDITOR_STAGE_W,
-  stageH = CROP_EDITOR_STAGE_H
-): View {
+function viewFromCrop(crop: Crop, stageW: number, stageH: number): View {
   const scaleByWidth = stageW / crop.width
   const scaleByHeight = stageH / crop.height
   const scale = Math.max(scaleByWidth, scaleByHeight)
@@ -46,11 +44,7 @@ function viewFromCrop(
   }
 }
 
-function cropFromView(
-  view: View,
-  stageW = CROP_EDITOR_STAGE_W,
-  stageH = CROP_EDITOR_STAGE_H
-): Crop {
+function cropFromView(view: View, stageW: number, stageH: number): Crop {
   return {
     x: -view.x / view.scale,
     y: -view.y / view.scale,
@@ -63,8 +57,8 @@ function clampView(
   view: View,
   naturalW: number,
   naturalH: number,
-  stageW = CROP_EDITOR_STAGE_W,
-  stageH = CROP_EDITOR_STAGE_H
+  stageW: number,
+  stageH: number
 ): View {
   const minScale = Math.max(stageW / naturalW, stageH / naturalH)
   const scale = Math.max(minScale, Math.min(view.scale, MAX_SCALE))
@@ -78,45 +72,75 @@ function clampView(
 export function CropEditor({ imageSrc, crop, onCropChange }: Props) {
   const [image, status] = useImage(imageSrc, "anonymous")
   const stageRef = useRef<Konva.Stage>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const [stageSize, setStageSize] = useState<StageSize | null>(null)
   const [view, setView] = useState<View | null>(null)
 
   const naturalW = image?.naturalWidth ?? 0
   const naturalH = image?.naturalHeight ?? 0
 
   useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const update = () => {
+      const w = el.clientWidth
+      if (w <= 0) return
+      const h = Math.round((w * PORTRAIT_ASPECT_H) / PORTRAIT_ASPECT_W)
+      setStageSize((prev) =>
+        prev && prev.w === w && prev.h === h ? prev : { w, h }
+      )
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Read crop via ref so the view-derive effect doesn't re-run on every drag.
+  const cropRef = useRef(crop)
+  cropRef.current = crop
+  useEffect(() => {
     if (!image || naturalW === 0 || naturalH === 0) return
-    if (view !== null) return
-    const initialCrop = crop ?? defaultCropForImage(naturalW, naturalH)
+    if (!stageSize) return
+    const sourceCrop = cropRef.current ?? defaultCropForImage(naturalW, naturalH)
     const next = clampView(
-      viewFromCrop(initialCrop, naturalW, naturalH),
+      viewFromCrop(sourceCrop, stageSize.w, stageSize.h),
       naturalW,
-      naturalH
+      naturalH,
+      stageSize.w,
+      stageSize.h
     )
     setView(next)
-  }, [image, naturalW, naturalH, crop, view])
+  }, [image, naturalW, naturalH, stageSize])
 
   const dragBound = useMemo(() => {
-    if (!image || !view) return undefined
+    if (!image || !view || !stageSize) return undefined
     const displayedW = naturalW * view.scale
     const displayedH = naturalH * view.scale
-    const minX = CROP_EDITOR_STAGE_W - displayedW
-    const minY = CROP_EDITOR_STAGE_H - displayedH
+    const minX = stageSize.w - displayedW
+    const minY = stageSize.h - displayedH
     return (pos: { x: number; y: number }) => ({
       x: Math.min(0, Math.max(pos.x, minX)),
       y: Math.min(0, Math.max(pos.y, minY)),
     })
-  }, [image, view, naturalW, naturalH])
+  }, [image, view, naturalW, naturalH, stageSize])
 
   function handleDragMove(event: KonvaEventObject<DragEvent>) {
-    if (!view) return
+    if (!view || !stageSize) return
     const node = event.target
     const next: View = { x: node.x(), y: node.y(), scale: view.scale }
     setView(next)
-    onCropChange(clampCrop(cropFromView(next), naturalW, naturalH))
+    onCropChange(
+      clampCrop(
+        cropFromView(next, stageSize.w, stageSize.h),
+        naturalW,
+        naturalH
+      )
+    )
   }
 
   function handleWheel(event: KonvaEventObject<WheelEvent>) {
-    if (!image || !view) return
+    if (!image || !view || !stageSize) return
     event.evt.preventDefault()
     const stage = event.target.getStage()
     if (!stage) return
@@ -138,19 +162,31 @@ export function CropEditor({ imageSrc, crop, onCropChange }: Props) {
       x: pointer.x - pointerInImage.x * proposedScale,
       y: pointer.y - pointerInImage.y * proposedScale,
     }
-    const next = clampView(provisional, naturalW, naturalH)
+    const next = clampView(
+      provisional,
+      naturalW,
+      naturalH,
+      stageSize.w,
+      stageSize.h
+    )
     setView(next)
-    onCropChange(clampCrop(cropFromView(next), naturalW, naturalH))
+    onCropChange(
+      clampCrop(
+        cropFromView(next, stageSize.w, stageSize.h),
+        naturalW,
+        naturalH
+      )
+    )
   }
 
   const wrapperStyle = {
     aspectRatio: `${CROP_EDITOR_STAGE_W} / ${CROP_EDITOR_STAGE_H}`,
-    maxWidth: CROP_EDITOR_STAGE_W,
   } as const
 
   if (status === "failed") {
     return (
       <div
+        ref={wrapperRef}
         style={wrapperStyle}
         className="flex w-full items-center justify-center rounded-lg border bg-muted text-sm shadow-sm"
       >
@@ -159,9 +195,10 @@ export function CropEditor({ imageSrc, crop, onCropChange }: Props) {
     )
   }
 
-  if (!image || !view) {
+  if (!image || !view || !stageSize) {
     return (
       <div
+        ref={wrapperRef}
         style={wrapperStyle}
         className="w-full rounded-lg border bg-muted shadow-sm"
       />
@@ -170,19 +207,17 @@ export function CropEditor({ imageSrc, crop, onCropChange }: Props) {
 
   return (
     <div
+      ref={wrapperRef}
       style={wrapperStyle}
       className="w-full overflow-hidden rounded-lg border bg-muted shadow-sm"
     >
       <Stage
         ref={stageRef}
-        width={CROP_EDITOR_STAGE_W}
-        height={CROP_EDITOR_STAGE_H}
+        width={stageSize.w}
+        height={stageSize.h}
         onWheel={handleWheel}
         style={{ width: "100%", height: "100%" }}
-        // `!important` is required: Konva sets `style="width: 400px"`
-        // inline on the canvas, which would otherwise win over our CSS and
-        // make the editor view ~0.5% larger than the SVG-based preview.
-        className="block touch-none [&>canvas]:block [&>canvas]:h-full! [&>canvas]:w-full!"
+        className="block touch-none"
       >
         <Layer>
           <KonvaImage
@@ -198,8 +233,8 @@ export function CropEditor({ imageSrc, crop, onCropChange }: Props) {
           <Rect
             x={0}
             y={0}
-            width={CROP_EDITOR_STAGE_W}
-            height={CROP_EDITOR_STAGE_H}
+            width={stageSize.w}
+            height={stageSize.h}
             stroke="white"
             strokeWidth={0}
             listening={false}

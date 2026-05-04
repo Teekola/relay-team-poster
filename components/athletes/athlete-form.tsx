@@ -277,15 +277,12 @@ export function AthleteForm({ athlete, isLoading }: Props) {
             <FieldLabel>{fi.athletes.fields.crop}</FieldLabel>
             <div className="flex w-full flex-col items-start gap-3">
               {isLoading ? (
-                // Same outer dimensions as the real CropEditor
-                // (400×500, 4:5) so there's no shift when the
-                // editor mounts.
-                <div className="aspect-4/5 w-full max-w-100 animate-pulse rounded-lg border bg-muted" />
+                <div className="aspect-4/5 w-full max-w-60 animate-pulse rounded-lg border bg-muted" />
               ) : (
                 editorImageSrc && (
                   <div
                     className={cn(
-                      "w-full",
+                      "w-full max-w-60",
                       !isCropOpen && "pointer-events-none"
                     )}
                   >
