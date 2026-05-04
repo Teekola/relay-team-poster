@@ -2,7 +2,13 @@
 
 import type Konva from "konva"
 import dynamic from "next/dynamic"
-import type { ComponentProps, RefObject } from "react"
+import {
+  type ComponentProps,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import type { Doc } from "@/convex/_generated/dataModel"
 import type { Layout } from "@/lib/layouts"
 import { cn } from "@/lib/utils"
@@ -43,6 +49,58 @@ export function TeamImageStage({ className, ...props }: Props) {
       )}
     >
       <InnerStage {...props} />
+    </div>
+  )
+}
+
+type ResponsiveProps = Omit<Props, "displayWidth"> & {
+  /** Hard cap on display width; the stage will be no wider than this. */
+  maxWidth: number
+}
+
+/**
+ * Auto-sizing wrapper around `TeamImageStage`: measures its own container
+ * and clamps `displayWidth` to `min(maxWidth, layout.canvas.w, container)`.
+ * Owns the resize state locally so width changes don't re-render the form
+ * column. Width is integer-snapped so sub-pixel jitter dedupes via the
+ * `setState` equality check.
+ */
+export function ResponsiveTeamImageStage({
+  maxWidth,
+  className,
+  ...stageProps
+}: ResponsiveProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [containerWidth, setContainerWidth] = useState(maxWidth)
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const update = () => {
+      const w = Math.floor(el.clientWidth)
+      if (w > 0) setContainerWidth((prev) => (prev === w ? prev : w))
+    }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const displayWidth = Math.min(
+    maxWidth,
+    stageProps.layout.canvas.w,
+    containerWidth
+  )
+
+  return (
+    <div ref={containerRef} className="w-full min-w-0">
+      <div className="lg:ml-auto lg:w-fit">
+        <TeamImageStage
+          {...stageProps}
+          className={className}
+          displayWidth={displayWidth}
+        />
+      </div>
     </div>
   )
 }
