@@ -5,8 +5,10 @@ const H = 2700
 
 // 25 athletes → 5 × 5 grid. Portraits are small; labels stay legible thanks
 // to the gradient fade and text shadow applied by TeamImageStage.
-const PORTRAIT_W = 360
-const PORTRAIT_H = 450 // 4:5
+// Portraits sized so the 5 rows fit above the bottom ~18% sponsor band:
+// 325 + 5*360 + 4*24 = 2221, leaving 479px (~17.7%) of canvas reserved.
+const PORTRAIT_W = 288
+const PORTRAIT_H = 360 // 4:5
 const COL_GAP = 24
 const ROW_GAP = 24
 const COLS = 5
@@ -15,7 +17,7 @@ const ROWS = 5
 const TOTAL_W = COLS * PORTRAIT_W + (COLS - 1) * COL_GAP
 const FIRST_X = (W - TOTAL_W) / 2
 
-const FIRST_ROW_Y = 360
+const FIRST_ROW_Y = 325
 const ROW_STARTS_Y = Array.from(
   { length: ROWS },
   (_, i) => FIRST_ROW_Y + i * (PORTRAIT_H + ROW_GAP)
@@ -25,7 +27,7 @@ const NAME_FONT_SIZE = 38
 const NUMBER_FONT_SIZE = 60
 
 const NAME_BOTTOM_OFFSET_Y = PORTRAIT_H - 14
-const NAME_BOX_TOP_OFFSET_Y = 280
+const NAME_BOX_TOP_OFFSET_Y = 224
 const NAME_BOX_HEIGHT = NAME_BOTTOM_OFFSET_Y - NAME_BOX_TOP_OFFSET_Y
 const NAME_LINE_HEIGHT = 1.05
 const NUMBER_OFFSET_Y =
@@ -33,7 +35,7 @@ const NUMBER_OFFSET_Y =
   NAME_FONT_SIZE * NAME_LINE_HEIGHT -
   NUMBER_FONT_SIZE / 2
 
-const NAME_INSET = 55
+const NAME_INSET = 45
 
 function athleteSlot(legIndex: number) {
   const rowIndex = Math.floor(legIndex / COLS)
@@ -48,7 +50,7 @@ function athleteSlot(legIndex: number) {
 
     // Anchored to the left edge of the portrait so two-digit numbers
     // ("10.", "25.") don't reach into the centered name area.
-    numberX: x - 16,
+    numberX: x - 32,
     numberY: y + NUMBER_OFFSET_Y,
     numberFontSize: NUMBER_FONT_SIZE,
 
@@ -86,7 +88,7 @@ const relay25: Layout = {
       y: 195,
       maxWidth: W,
       align: "center",
-      fontSize: 120,
+      fontSize: 96,
       fontWeight: 700,
       fill: "#facc15",
     },
