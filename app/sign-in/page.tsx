@@ -25,8 +25,8 @@ import { fi } from "@/messages/fi"
 type Mode = "signIn" | "signUp"
 
 const signInSchema = z.object({
-  email: z.email(fi.signIn.errors.generic),
-  password: z.string().min(8, fi.signIn.errors.generic),
+  email: z.email(fi.signIn.errors.invalidEmail),
+  password: z.string().min(8, fi.signIn.errors.passwordTooShort),
   name: z.string().optional(),
 })
 

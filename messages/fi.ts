@@ -10,6 +10,12 @@ export const fi = {
     signOut: "Kirjaudu ulos",
     menu: "Valikko",
   },
+  theme: {
+    toggle: "Vaihda teema",
+    light: "Vaalea",
+    dark: "Tumma",
+    system: "Järjestelmä",
+  },
   signIn: {
     title: "Kirjaudu sisään",
     subtitle: "Käytä rekisteröitynyttä sähköpostia ja salasanaa.",
@@ -24,6 +30,8 @@ export const fi = {
       generic: "Kirjautuminen epäonnistui. Tarkista sähköposti ja salasana.",
       restricted:
         "Rekisteröityminen on rajoitettu. Pyydä ylläpitäjältä pääsyä.",
+      invalidEmail: "Anna kelvollinen sähköpostiosoite.",
+      passwordTooShort: "Salasanan tulee olla vähintään 8 merkkiä.",
     },
   },
   athletes: {
