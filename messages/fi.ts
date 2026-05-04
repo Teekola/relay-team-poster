@@ -17,6 +17,29 @@ export const fi = {
     signOut: "Kirjaudu ulos",
     menu: "Valikko",
   },
+  dashboard: {
+    title: "Joukkuekuvageneraattori",
+    sections: {
+      teams: {
+        title: "Joukkuekuvat",
+        description: "Selaa aiemmin tehtyjä julkaisuja.",
+        action: "Uusi joukkuekuva",
+        view: "Avaa joukkuekuvat",
+      },
+      athletes: {
+        title: "Urheilijat",
+        description: "Hallinnoi urheilijoiden kuvia ja tietoja.",
+        action: "Lisää urheilija",
+        view: "Avaa urheilijat",
+      },
+      templates: {
+        title: "Mallit",
+        description: "Luo ja muokkaa kuvamalleja.",
+        action: "Uusi malli",
+        view: "Avaa mallit",
+      },
+    },
+  },
   theme: {
     toggle: "Vaihda teema",
   },

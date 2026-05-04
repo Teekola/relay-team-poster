@@ -77,7 +77,7 @@ export function SiteNav() {
           </PopoverContent>
         </Popover>
 
-        <Link href="/teams" className="shrink-0 font-medium">
+        <Link href="/dashboard" className="shrink-0 font-medium">
           {fi.app.name}
         </Link>
 
