@@ -38,6 +38,11 @@ type Props = {
    * loading state and switch to the real values once data lands.
    */
   isLoading?: boolean
+  /**
+   * Fires on every keystroke in the name field so the parent can mirror
+   * the in-progress name in the page header / breadcrumb.
+   */
+  onNameChange?: (name: string) => void
 }
 
 type FormValues = {
@@ -52,7 +57,7 @@ type PendingPhoto = {
   naturalHeight: number
 }
 
-export function AthleteForm({ athlete, isLoading }: Props) {
+export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
   const router = useRouter()
   const generateUploadUrl = useMutation(api.files.generateUploadUrl)
   const createAthlete = useMutation(api.athletes.create)
@@ -78,6 +83,11 @@ export function AthleteForm({ athlete, isLoading }: Props) {
       if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.blobUrl)
     }
   }, [pendingPhoto])
+
+  const watchedName = form.watch("name")
+  useEffect(() => {
+    onNameChange?.(watchedName)
+  }, [watchedName, onNameChange])
 
   // When the athlete record arrives (transition from undefined → object),
   // sync the form values so the displayed inputs reflect the loaded data.
