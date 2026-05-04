@@ -68,9 +68,9 @@ function RosterPickerInner({
             // Slots are positional (leg 1, leg 2, …); index is the natural key.
             // biome-ignore lint/suspicious/noArrayIndexKey: positional UI, not data identity
             key={`slot-${index}`}
-            className="flex items-center gap-3"
+            className="flex items-center gap-2"
           >
-            <span className="w-8 shrink-0 text-muted-foreground text-sm">
+            <span className="w-5 shrink-0 text-muted-foreground text-sm tabular-nums">
               {index + 1}.
             </span>
             <Combobox
