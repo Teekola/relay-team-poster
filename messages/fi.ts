@@ -167,6 +167,7 @@ export const fi = {
     relay2: "2-osainen viesti",
     relay3: "3-osainen viesti",
     relay4: "4-osainen viesti (Venla)",
+    relay6: "6-osainen viesti",
     relay7: "7-osainen viesti (Jukola)",
     relay10: "10-osainen viesti (Tiomila)",
     relay25: "25-osainen viesti (25-manna)",

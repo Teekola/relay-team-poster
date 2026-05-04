@@ -48,6 +48,7 @@ export type LayoutId =
   | "relay2"
   | "relay3"
   | "relay4"
+  | "relay6"
   | "relay7"
   | "relay10"
   | "relay25"
