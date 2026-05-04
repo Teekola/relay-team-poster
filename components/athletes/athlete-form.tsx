@@ -19,7 +19,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { api } from "@/convex/_generated/api"
-import type { Doc, Id } from "@/convex/_generated/dataModel"
+import type { Doc } from "@/convex/_generated/dataModel"
+import { useStorageUpload } from "@/hooks/use-storage-upload"
 import { type Crop, defaultCropForImage } from "@/lib/crop"
 import { cn } from "@/lib/utils"
 import { fi } from "@/messages/fi"
@@ -51,7 +52,7 @@ type PendingPhoto = {
 
 export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
   const router = useRouter()
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl)
+  const uploadFile = useStorageUpload()
   const createAthlete = useMutation(api.athletes.create)
   const updateAthlete = useMutation(api.athletes.update)
 
@@ -108,22 +109,6 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
       setError("Kuvan lataus epäonnistui.")
     }
     img.src = blobUrl
-  }
-
-  async function uploadFile(file: File): Promise<Id<"_storage">> {
-    const uploadUrl = await generateUploadUrl()
-    const result = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": file.type },
-      body: file,
-    })
-    if (!result.ok) {
-      throw new Error(`Upload failed: ${result.status}`)
-    }
-    const { storageId } = (await result.json()) as {
-      storageId: Id<"_storage">
-    }
-    return storageId
   }
 
   const handleSubmit = form.handleSubmit(async (values) => {

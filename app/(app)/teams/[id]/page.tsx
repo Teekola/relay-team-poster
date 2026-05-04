@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { useHydrated } from "@/hooks/use-hydrated"
+import { useOrderedAthletes } from "@/hooks/use-ordered-athletes"
 import { LAYOUT_IDS, LAYOUTS, type LayoutId } from "@/lib/layouts"
 import { fi } from "@/messages/fi"
 
@@ -148,15 +149,7 @@ export default function EditTeamImagePage() {
   }, [templateId, templates])
 
   const deferredTextValues = useDeferredValue(textValues)
-  const deferredAthleteOrder = useDeferredValue(athleteOrder)
-
-  const orderedAthletes = useMemo(() => {
-    if (!athletes) return []
-    return deferredAthleteOrder.map((id) => {
-      if (!id) return null
-      return athletes.find((a) => a._id === id) ?? null
-    })
-  }, [deferredAthleteOrder, athletes])
+  const orderedAthletes = useOrderedAthletes(athleteOrder, athletes)
 
   const isDirty = useMemo(() => {
     const snap = initialSnapshotRef.current

@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { api } from "@/convex/_generated/api"
-import type { Doc, Id } from "@/convex/_generated/dataModel"
+import type { Doc } from "@/convex/_generated/dataModel"
+import { useStorageUpload } from "@/hooks/use-storage-upload"
 import { ASPECT_DIMENSIONS, ASPECTS, type Aspect } from "@/lib/layouts"
 import { cn } from "@/lib/utils"
 import { fi } from "@/messages/fi"
@@ -46,7 +47,7 @@ function isAspect(value: string): value is Aspect {
 
 export function TemplateForm({ template, isLoading }: Props) {
   const router = useRouter()
-  const generateUploadUrl = useMutation(api.files.generateUploadUrl)
+  const uploadFile = useStorageUpload()
   const createTemplate = useMutation(api.templates.create)
   const updateTemplate = useMutation(api.templates.update)
 
@@ -118,20 +119,6 @@ export function TemplateForm({ template, isLoading }: Props) {
       setPendingBackground(null)
     }
     img.src = blobUrl
-  }
-
-  async function uploadFile(file: File): Promise<Id<"_storage">> {
-    const uploadUrl = await generateUploadUrl()
-    const result = await fetch(uploadUrl, {
-      method: "POST",
-      headers: { "Content-Type": file.type },
-      body: file,
-    })
-    if (!result.ok) {
-      throw new Error(`Upload failed: ${result.status}`)
-    }
-    const json: { storageId: Id<"_storage"> } = await result.json()
-    return json.storageId
   }
 
   const handleSubmit = form.handleSubmit(async (values) => {

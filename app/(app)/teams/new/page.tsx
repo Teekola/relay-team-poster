@@ -16,6 +16,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
+import { useOrderedAthletes } from "@/hooks/use-ordered-athletes"
 import { LAYOUTS, type LayoutId } from "@/lib/layouts"
 import { fi } from "@/messages/fi"
 
@@ -50,18 +51,10 @@ export default function NewTeamImagePage() {
   }, [templates, templateId])
 
   const deferredTextValues = useDeferredValue(textValues)
-  const deferredAthleteOrder = useDeferredValue(athleteOrder)
-
   // Preserve positional alignment: index N here MUST match slot index N in
-  // the layout. Empty/missing slots are kept as null so the stage skips them
-  // without shifting later athletes leftward.
-  const orderedAthletes = useMemo(() => {
-    if (!athletes) return []
-    return deferredAthleteOrder.map((id) => {
-      if (!id) return null
-      return athletes.find((a) => a._id === id) ?? null
-    })
-  }, [deferredAthleteOrder, athletes])
+  // the layout. Empty slots stay null so the stage skips them without
+  // shifting later athletes leftward.
+  const orderedAthletes = useOrderedAthletes(athleteOrder, athletes)
 
   const rosterComplete =
     athleteOrder.length === layout.requiredAthleteCount &&
