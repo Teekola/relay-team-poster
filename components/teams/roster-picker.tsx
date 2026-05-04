@@ -54,7 +54,7 @@ function RosterPickerInner({
     (_, i) => selected[i] ?? null
   )
 
-  function setSlot(index: number, value: Id<"athletes">) {
+  function setSlot(index: number, value: Id<"athletes"> | null) {
     const next = [...slots]
     next[index] = value
     onChange(next)
@@ -63,14 +63,6 @@ function RosterPickerInner({
   return (
     <div className="flex flex-col gap-3">
       {slots.map((selectedId, index) => {
-        const otherSelected = new Set(
-          slots.flatMap((id, i) => (i !== index && id !== null ? [id] : []))
-        )
-        const slotOptions = allOptions.filter(
-          (option) =>
-            !otherSelected.has(option.value as Id<"athletes">) ||
-            option.value === selectedId
-        )
         return (
           <div
             // Slots are positional (leg 1, leg 2, …); index is the natural key.
@@ -83,9 +75,13 @@ function RosterPickerInner({
             </span>
             <Combobox
               className="flex-1"
-              options={slotOptions}
+              // Same athlete may appear in multiple slots — useful when a
+              // runner takes more than one leg or the editor is sketching.
+              options={allOptions}
               value={selectedId}
-              onChange={(value) => setSlot(index, value as Id<"athletes">)}
+              onChange={(value) =>
+                setSlot(index, (value as Id<"athletes"> | null) ?? null)
+              }
               placeholder={fi.teams.actions.pickAthlete}
               emptyMessage={fi.athletes.empty}
               isLoading={showLoading}
