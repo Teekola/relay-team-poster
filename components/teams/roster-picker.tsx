@@ -32,7 +32,7 @@ function RosterPickerInner({
 }: Props) {
   // The full option list is computed once per athletes change; per-slot
   // exclusion happens below by filtering this stable array.
-  const allOptions = useMemo<ComboboxOption[]>(
+  const allOptions = useMemo<ComboboxOption<Id<"athletes">>[]>(
     () =>
       (athletes ?? []).map((athlete) => ({
         value: athlete._id,
@@ -79,9 +79,7 @@ function RosterPickerInner({
               // runner takes more than one leg or the editor is sketching.
               options={allOptions}
               value={selectedId}
-              onChange={(value) =>
-                setSlot(index, (value as Id<"athletes"> | null) ?? null)
-              }
+              onChange={(value) => setSlot(index, value)}
               placeholder={fi.teams.actions.pickAthlete}
               emptyMessage={fi.athletes.empty}
               isLoading={showLoading}

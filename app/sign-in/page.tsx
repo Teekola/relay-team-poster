@@ -3,7 +3,7 @@
 import { useAuthActions } from "@convex-dev/auth/react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,13 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { FieldGroup } from "@/components/ui/field"
+import { FormInput } from "@/components/ui/form-fields"
 import { fi } from "@/messages/fi"
 
 type Mode = "signIn" | "signUp"
@@ -76,73 +71,32 @@ export default function SignInPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">
             <FieldGroup>
-              <Controller
-                name="email"
+              <FormInput
                 control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      {fi.signIn.emailLabel}
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      id={field.name}
-                      type="email"
-                      autoComplete="email"
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
+                name="email"
+                label={fi.signIn.emailLabel}
+                type="email"
+                autoComplete="email"
               />
 
               {mode === "signUp" && (
-                <Controller
-                  name="name"
+                <FormInput
                   control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={field.name}>
-                        {fi.signIn.nameLabel}
-                      </FieldLabel>
-                      <Input
-                        {...field}
-                        id={field.name}
-                        type="text"
-                        autoComplete="name"
-                      />
-                      {fieldState.invalid && (
-                        <FieldError errors={[fieldState.error]} />
-                      )}
-                    </Field>
-                  )}
+                  name="name"
+                  label={fi.signIn.nameLabel}
+                  type="text"
+                  autoComplete="name"
                 />
               )}
 
-              <Controller
-                name="password"
+              <FormInput
                 control={form.control}
-                render={({ field, fieldState }) => (
-                  <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor={field.name}>
-                      {fi.signIn.passwordLabel}
-                    </FieldLabel>
-                    <Input
-                      {...field}
-                      id={field.name}
-                      type="password"
-                      autoComplete={
-                        mode === "signIn" ? "current-password" : "new-password"
-                      }
-                      aria-invalid={fieldState.invalid}
-                    />
-                    {fieldState.invalid && (
-                      <FieldError errors={[fieldState.error]} />
-                    )}
-                  </Field>
-                )}
+                name="password"
+                label={fi.signIn.passwordLabel}
+                type="password"
+                autoComplete={
+                  mode === "signIn" ? "current-password" : "new-password"
+                }
               />
             </FieldGroup>
 

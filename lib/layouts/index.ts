@@ -34,10 +34,27 @@ export const ASPECT_DIMENSIONS: Record<Aspect, { w: number; h: number }> = {
 
 export const ASPECTS: readonly Aspect[] = ["square", "portrait"]
 
+const LAYOUT_ID_SET: ReadonlySet<string> = new Set<string>(LAYOUT_IDS)
+
+export function isLayoutId(value: string): value is LayoutId {
+  return LAYOUT_ID_SET.has(value)
+}
+
 export function layoutsByAspect(aspect: Aspect): Layout[] {
   return LAYOUT_IDS.map((id) => LAYOUTS[id]).filter(
     (layout) => layout.aspect === aspect
   )
+}
+
+export function withLayoutDefaults(
+  layout: Layout,
+  stored: Record<string, string>
+): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const slot of layout.textSlots) {
+    if (slot.defaultValue) result[slot.key] = slot.defaultValue
+  }
+  return { ...result, ...stored }
 }
 
 export type { Aspect, AthleteSlot, Layout, LayoutId, TextSlot }

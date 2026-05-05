@@ -1,9 +1,11 @@
 "use client"
 
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation } from "convex/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
 import { FormActions } from "@/components/forms/form-actions"
 import {
   Field,
@@ -12,9 +14,8 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { FormInput, FormRadioGroup } from "@/components/ui/form-fields"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { api } from "@/convex/_generated/api"
 import type { Doc } from "@/convex/_generated/dataModel"
 import { useStorageUpload } from "@/hooks/use-storage-upload"
@@ -27,22 +28,18 @@ type Props = {
   isLoading?: boolean
 }
 
-type FormValues = {
-  name: string
-  aspect: Aspect
-}
+const templateSchema = z.object({
+  name: z.string().min(1, fi.common.requiredField),
+  aspect: z.enum(ASPECTS as readonly [Aspect, ...Aspect[]]),
+})
+
+type FormValues = z.infer<typeof templateSchema>
 
 type PendingBackground = {
   blobUrl: string
   file: File
   naturalWidth: number
   naturalHeight: number
-}
-
-const ASPECT_SET: ReadonlySet<string> = new Set<string>(ASPECTS)
-
-function isAspect(value: string): value is Aspect {
-  return ASPECT_SET.has(value)
 }
 
 export function TemplateForm({ template, isLoading }: Props) {
@@ -59,11 +56,16 @@ export function TemplateForm({ template, isLoading }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  const formValues = useMemo<FormValues | undefined>(() => {
+    if (!template) return undefined
+    return { name: template.name, aspect: template.aspect }
+  }, [template])
+
   const form = useForm<FormValues>({
-    defaultValues: {
-      name: template?.name ?? "",
-      aspect: template?.aspect ?? "square",
-    },
+    resolver: zodResolver(templateSchema),
+    defaultValues: { name: "", aspect: "square" },
+    values: formValues,
+    resetOptions: { keepDirtyValues: true },
   })
 
   const selectedAspect = form.watch("aspect")
@@ -74,12 +76,6 @@ export function TemplateForm({ template, isLoading }: Props) {
       if (pendingBackground) URL.revokeObjectURL(pendingBackground.blobUrl)
     }
   }, [pendingBackground])
-
-  useEffect(() => {
-    if (template) {
-      form.reset({ name: template.name, aspect: template.aspect })
-    }
-  }, [template, form])
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -178,55 +174,24 @@ export function TemplateForm({ template, isLoading }: Props) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <FieldGroup>
-        <Controller
-          name="name"
+        <FormInput
           control={form.control}
-          rules={{ required: fi.common.requiredField, minLength: 1 }}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name}>
-                {fi.templates.fields.name}
-              </FieldLabel>
-              <Input
-                {...field}
-                id={field.name}
-                aria-invalid={fieldState.invalid}
-                isLoading={isLoading}
-              />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
+          name="name"
+          label={fi.templates.fields.name}
+          isLoading={isLoading}
         />
 
-        <Controller
-          name="aspect"
+        <FormRadioGroup
           control={form.control}
-          render={({ field }) => (
-            <Field>
-              <FieldLabel>{fi.templates.fields.aspect}</FieldLabel>
-              <RadioGroup
-                value={field.value}
-                onValueChange={(value) => {
-                  if (typeof value === "string" && isAspect(value)) {
-                    field.onChange(value)
-                  }
-                }}
-                disabled={isEditing}
-                className="flex flex-row gap-6"
-                isLoading={isLoading}
-              >
-                {ASPECTS.map((aspect) => (
-                  <Label
-                    key={aspect}
-                    className="flex cursor-pointer items-center gap-2 font-normal text-sm"
-                  >
-                    <RadioGroupItem value={aspect} disabled={isEditing} />
-                    {fi.templates.aspects[aspect]}
-                  </Label>
-                ))}
-              </RadioGroup>
-            </Field>
-          )}
+          name="aspect"
+          label={fi.templates.fields.aspect}
+          orientation="horizontal"
+          isLoading={isLoading}
+          disabled={isEditing}
+          options={ASPECTS.map((aspect) => ({
+            value: aspect,
+            label: fi.templates.aspects[aspect],
+          }))}
         />
 
         <Field>

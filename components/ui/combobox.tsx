@@ -18,21 +18,21 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
-export type ComboboxOption = {
-  value: string
+export type ComboboxOption<TValue extends string = string> = {
+  value: TValue
   label: string
   /** Extra strings used for fuzzy match in addition to `label`. */
   keywords?: string[]
 }
 
-type Props = {
-  options: ComboboxOption[]
-  value: string | null
+type Props<TValue extends string> = {
+  options: ComboboxOption<TValue>[]
+  value: TValue | null
   /**
    * Called with the picked option's value, or with `null` when the user
    * clears the current selection via the inline "x" button.
    */
-  onChange: (value: string | null) => void
+  onChange: (value: TValue | null) => void
   placeholder?: string
   searchPlaceholder?: string
   emptyMessage?: string
@@ -43,7 +43,7 @@ type Props = {
   clearable?: boolean
 }
 
-export function Combobox({
+export function Combobox<TValue extends string = string>({
   options,
   value,
   onChange,
@@ -54,7 +54,7 @@ export function Combobox({
   disabled,
   isLoading,
   clearable = true,
-}: Props) {
+}: Props<TValue>) {
   const [open, setOpen] = useState(false)
   if (isLoading) {
     return (
@@ -83,7 +83,7 @@ export function Combobox({
               type="button"
               variant="outline"
               className={cn(
-                "w-full justify-start font-normal",
+                "w-full justify-start rounded-3xl border-transparent bg-input/50 font-normal hover:bg-input/70 dark:bg-input/50 dark:hover:bg-input/70",
                 !selected && "text-muted-foreground",
                 showClear && "pr-9"
               )}
@@ -107,7 +107,12 @@ export function Combobox({
             }}
             className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-3xl text-muted-foreground hover:text-foreground"
           >
-            <HugeiconsIcon icon={Cancel01Icon} className="size-4" aria-hidden />
+            <HugeiconsIcon
+              icon={Cancel01Icon}
+              strokeWidth={2}
+              className="size-4"
+              aria-hidden
+            />
           </button>
         )}
       </div>

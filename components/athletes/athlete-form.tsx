@@ -1,23 +1,23 @@
 "use client"
 
+import { zodResolver } from "@hookform/resolvers/zod"
 import { InformationCircleIcon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useMutation } from "convex/react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
-import { Controller, useForm } from "react-hook-form"
+import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { z } from "zod"
 import { FormActions } from "@/components/forms/form-actions"
 import { Button } from "@/components/ui/button"
 import {
   Field,
   FieldDescription,
-  FieldError,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { FormInput, FormRadioGroup } from "@/components/ui/form-fields"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { api } from "@/convex/_generated/api"
 import type { Doc } from "@/convex/_generated/dataModel"
 import { useStorageUpload } from "@/hooks/use-storage-upload"
@@ -38,10 +38,12 @@ type Props = {
   onNameChange?: (name: string) => void
 }
 
-type FormValues = {
-  name: string
-  gender: "M" | "W"
-}
+const athleteSchema = z.object({
+  name: z.string().min(1, fi.common.requiredField),
+  gender: z.enum(["M", "W"]),
+})
+
+type FormValues = z.infer<typeof athleteSchema>
 
 type PendingPhoto = {
   blobUrl: string
@@ -63,11 +65,16 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
   // Auto-opens after a fresh upload — users almost always want to recrop then.
   const [isCropOpen, setIsCropOpen] = useState(false)
 
+  const formValues = useMemo<FormValues | undefined>(() => {
+    if (!athlete) return undefined
+    return { name: athlete.name, gender: athlete.gender }
+  }, [athlete])
+
   const form = useForm<FormValues>({
-    defaultValues: {
-      name: athlete?.name ?? "",
-      gender: athlete?.gender ?? "M",
-    },
+    resolver: zodResolver(athleteSchema),
+    defaultValues: { name: "", gender: "M" },
+    values: formValues,
+    resetOptions: { keepDirtyValues: true },
   })
 
   useEffect(() => {
@@ -81,13 +88,9 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
     onNameChange?.(watchedName)
   }, [watchedName, onNameChange])
 
-  // RHF's defaultValues only apply at mount, so reset once data arrives.
   useEffect(() => {
-    if (athlete) {
-      form.reset({ name: athlete.name, gender: athlete.gender })
-      setCrop(athlete.crop)
-    }
-  }, [athlete, form])
+    if (athlete) setCrop(athlete.crop)
+  }, [athlete])
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -195,49 +198,23 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
         </p>
       )}
       <FieldGroup>
-        <Controller
-          name="name"
+        <FormInput
           control={form.control}
-          rules={{ required: fi.common.requiredField, minLength: 1 }}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name}>
-                {fi.athletes.fields.name}
-              </FieldLabel>
-              <Input
-                {...field}
-                id={field.name}
-                aria-invalid={fieldState.invalid}
-                isLoading={isLoading}
-              />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
+          name="name"
+          label={fi.athletes.fields.name}
+          isLoading={isLoading}
         />
 
-        <Controller
-          name="gender"
+        <FormRadioGroup
           control={form.control}
-          render={({ field }) => (
-            <Field>
-              <FieldLabel>{fi.athletes.fields.gender}</FieldLabel>
-              <RadioGroup
-                value={field.value}
-                onValueChange={(value) => field.onChange(value)}
-                className="flex flex-row gap-6"
-                isLoading={isLoading}
-              >
-                <Label className="flex cursor-pointer items-center gap-2 font-normal text-sm">
-                  <RadioGroupItem value="M" />
-                  {fi.athletes.fields.genderM}
-                </Label>
-                <Label className="flex cursor-pointer items-center gap-2 font-normal text-sm">
-                  <RadioGroupItem value="W" />
-                  {fi.athletes.fields.genderW}
-                </Label>
-              </RadioGroup>
-            </Field>
-          )}
+          name="gender"
+          label={fi.athletes.fields.gender}
+          orientation="horizontal"
+          isLoading={isLoading}
+          options={[
+            { value: "M", label: fi.athletes.fields.genderM },
+            { value: "W", label: fi.athletes.fields.genderW },
+          ]}
         />
 
         <Field>

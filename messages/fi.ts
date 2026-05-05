@@ -191,8 +191,7 @@ export const fi = {
       pickAthlete: "Valitse urheilija",
     },
     errors: {
-      rosterIncomplete: (missing: number) =>
-        `Lisää vielä ${missing} urheilijaa.`,
+      templateRequired: "Valitse malli.",
     },
     deleteDialog: {
       title: "Poista joukkuekuva pysyvästi",

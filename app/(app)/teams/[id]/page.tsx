@@ -1,5 +1,6 @@
 "use client"
 
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery } from "convex/react"
 import type Konva from "konva"
 import { notFound, useParams, useRouter } from "next/navigation"
@@ -13,12 +14,12 @@ import {
 } from "react"
 import {
   type Control,
-  Controller,
   type UseFormReturn,
   useForm,
   useFormState,
   useWatch,
 } from "react-hook-form"
+import { z } from "zod"
 import { FormActions } from "@/components/forms/form-actions"
 import { PageHeader } from "@/components/layout/page-header"
 import { ExportButton } from "@/components/team-image/export-button"
@@ -29,23 +30,22 @@ import {
 import { DeleteTeamImageButton } from "@/components/teams/delete-team-image-button"
 import { LayoutRadioGroup } from "@/components/teams/layout-radio-group"
 import { RosterPicker } from "@/components/teams/roster-picker"
-import { TemplateSelect } from "@/components/teams/template-select"
-import { TextSlotField } from "@/components/teams/text-slot-field"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { FieldGroup } from "@/components/ui/field"
+import { FormBase, FormInput, FormSelect } from "@/components/ui/form-fields"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { useHydrated } from "@/hooks/use-hydrated"
 import { useOrderedAthletes } from "@/hooks/use-ordered-athletes"
-import { LAYOUT_IDS, LAYOUTS, type Layout, type LayoutId } from "@/lib/layouts"
+import {
+  isLayoutId,
+  LAYOUT_IDS,
+  LAYOUTS,
+  type Layout,
+  type LayoutId,
+  withLayoutDefaults,
+} from "@/lib/layouts"
 import { fi } from "@/messages/fi"
-
-const LAYOUT_ID_SET: ReadonlySet<string> = new Set<string>(LAYOUT_IDS)
-
-function isLayoutId(value: string): value is LayoutId {
-  return LAYOUT_ID_SET.has(value)
-}
 
 const STAGE_DISPLAY_WIDTH = 540
 const STAGE_PLACEHOLDER_ASPECT = 1
@@ -55,8 +55,6 @@ const PLACEHOLDER_TEXT_SLOTS = [
   { key: "_loading_team", label: "Joukkueteksti" },
 ] as const
 
-// Form-display order is intentionally decoupled from layout slot order
-// (which controls Konva positioning) so switching layout doesn't reshuffle.
 const TEXT_SLOT_PRIORITY: Record<string, number> = {
   eventName: 0,
   teamLabel: 1,
@@ -70,13 +68,40 @@ function compareTextSlots<T extends { key: string }>(a: T, b: T): number {
   return a.key.localeCompare(b.key)
 }
 
-type FormValues = {
-  name: string
-  layoutId: LayoutId | null
-  templateId: Id<"templates"> | null
-  textValues: Record<string, string>
-  athleteOrder: (Id<"athletes"> | null)[]
-}
+const teamImageSchema = z
+  .object({
+    name: z.string().trim().min(1, fi.common.requiredField),
+    layoutId: z
+      .enum(LAYOUT_IDS as readonly [LayoutId, ...LayoutId[]])
+      .nullable(),
+    templateId: z
+      .custom<Id<"templates">>((v) => typeof v === "string" && v.length > 0)
+      .nullable(),
+    textValues: z.record(z.string(), z.string()),
+    athleteOrder: z.array(
+      z
+        .custom<Id<"athletes">>((v) => typeof v === "string" && v.length > 0)
+        .nullable()
+    ),
+  })
+  .superRefine((data, ctx) => {
+    if (data.layoutId === null) {
+      ctx.addIssue({
+        code: "custom",
+        message: fi.common.requiredField,
+        path: ["layoutId"],
+      })
+    }
+    if (data.templateId === null) {
+      ctx.addIssue({
+        code: "custom",
+        message: fi.teams.errors.templateRequired,
+        path: ["templateId"],
+      })
+    }
+  })
+
+type FormValues = z.infer<typeof teamImageSchema>
 
 const EMPTY_DEFAULTS: FormValues = {
   name: "",
@@ -84,17 +109,6 @@ const EMPTY_DEFAULTS: FormValues = {
   templateId: null,
   textValues: {},
   athleteOrder: [],
-}
-
-function withLayoutDefaults(
-  layout: Layout,
-  stored: Record<string, string>
-): Record<string, string> {
-  const result: Record<string, string> = {}
-  for (const slot of layout.textSlots) {
-    if (slot.defaultValue) result[slot.key] = slot.defaultValue
-  }
-  return { ...result, ...stored }
 }
 
 export default function EditTeamImagePage() {
@@ -111,10 +125,26 @@ export default function EditTeamImagePage() {
   const stageRef = useRef<Konva.Stage>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
-  const [hasInitialized, setHasInitialized] = useState(false)
   const [wasLoaded, setWasLoaded] = useState(false)
 
-  const form = useForm<FormValues>({ defaultValues: EMPTY_DEFAULTS })
+  const formValues = useMemo<FormValues | undefined>(() => {
+    if (!teamImage || !isLayoutId(teamImage.layoutId)) return undefined
+    const layout = LAYOUTS[teamImage.layoutId]
+    return {
+      name: teamImage.name,
+      layoutId: teamImage.layoutId,
+      templateId: teamImage.templateId,
+      textValues: withLayoutDefaults(layout, teamImage.textValues),
+      athleteOrder: teamImage.athleteOrder,
+    }
+  }, [teamImage])
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(teamImageSchema),
+    defaultValues: EMPTY_DEFAULTS,
+    values: formValues,
+    resetOptions: { keepDirtyValues: true },
+  })
 
   useEffect(() => {
     if (teamImage) setWasLoaded(true)
@@ -125,21 +155,6 @@ export default function EditTeamImagePage() {
     }
   }, [wasLoaded, teamImage, router])
 
-  // RHF's defaultValues are mount-only, so reset() once the query resolves.
-  useEffect(() => {
-    if (!teamImage || hasInitialized) return
-    if (!isLayoutId(teamImage.layoutId)) return
-    const layout = LAYOUTS[teamImage.layoutId]
-    form.reset({
-      name: teamImage.name,
-      layoutId: teamImage.layoutId,
-      templateId: teamImage.templateId,
-      textValues: withLayoutDefaults(layout, teamImage.textValues),
-      athleteOrder: teamImage.athleteOrder,
-    })
-    setHasInitialized(true)
-  }, [teamImage, hasInitialized, form])
-
   const layoutId = useWatch({ control: form.control, name: "layoutId" })
   const layout = layoutId ? LAYOUTS[layoutId] : null
 
@@ -149,7 +164,8 @@ export default function EditTeamImagePage() {
   )
 
   const hydrated = useHydrated()
-  const isLoading = !hydrated || !hasInitialized
+  const isLoading =
+    !hydrated || teamImage === undefined || formValues === undefined
   const layoutUnknown =
     teamImage !== undefined &&
     teamImage !== null &&
@@ -181,34 +197,18 @@ export default function EditTeamImagePage() {
   }
 
   const handleSave = form.handleSubmit(async (values) => {
+    if (!values.layoutId || !values.templateId) return
     setError(null)
-    if (!values.layoutId) return
-    if (!values.templateId) {
-      setError("Valitse malli.")
-      return
-    }
-    const validIds = values.athleteOrder.filter(
-      (id): id is Id<"athletes"> => id !== null
-    )
-    const requiredCount = LAYOUTS[values.layoutId].requiredAthleteCount
-    if (validIds.length !== requiredCount) {
-      setError(
-        fi.teams.errors.rosterIncomplete(requiredCount - validIds.length)
-      )
-      return
-    }
     setIsSaving(true)
     try {
-      const trimmedName = values.name.trim()
       await updateTeamImage({
         id: teamImageId,
-        name: trimmedName,
+        name: values.name,
         layoutId: values.layoutId,
         templateId: values.templateId,
-        athleteOrder: validIds,
+        athleteOrder: values.athleteOrder,
         textValues: values.textValues,
       })
-      form.reset({ ...values, name: trimmedName }, { keepValues: true })
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : "Tallennus epäonnistui."
@@ -263,7 +263,6 @@ export default function EditTeamImagePage() {
             error={error}
             isSaving={isSaving}
             isLoading={isLoading}
-            layout={layout}
             templates={templates}
             stageRef={stageRef}
             fallbackName={teamImage?.name ?? ""}
@@ -365,77 +364,84 @@ function FormFields({
     (s) => s.key !== "eventName" && s.key !== "_loading_event"
   )
 
+  const isEmpty = templates !== undefined && templates.length === 0
+  const templatePlaceholder =
+    templates === undefined
+      ? fi.common.loading
+      : isEmpty
+        ? fi.templates.empty
+        : fi.teams.fields.template
+
   return (
     <FieldGroup>
-      <Field>
-        <FieldLabel htmlFor="team-image-name">
-          {fi.teams.fields.name}
-        </FieldLabel>
-        <Input
-          id="team-image-name"
-          {...form.register("name")}
-          isLoading={isLoading}
-        />
-      </Field>
+      <FormInput
+        control={form.control}
+        name="name"
+        label={fi.teams.fields.name}
+        isLoading={isLoading}
+      />
 
-      <Controller
+      <FormBase
         control={form.control}
         name="layoutId"
-        render={({ field }) => (
+        label={fi.teams.fields.layout}
+      >
+        {(field) => (
           <LayoutRadioGroup
             value={field.value}
             onChange={(value) => onLayoutChange(value, field.value)}
             isLoading={isLoading}
           />
         )}
-      />
+      </FormBase>
 
-      <Controller
+      <FormSelect
         control={form.control}
         name="templateId"
-        render={({ field }) => (
-          <TemplateSelect
-            templates={templates}
-            value={field.value}
-            onChange={field.onChange}
-            isLoading={isLoading}
-          />
-        )}
+        label={fi.teams.fields.template}
+        placeholder={templatePlaceholder}
+        isLoading={isLoading}
+        disabled={templates === undefined || isEmpty}
+        options={(templates ?? []).map((template) => ({
+          value: template._id,
+          label: template.name,
+        }))}
       />
 
       {eventSlot && (
-        <TextSlotField
-          slot={eventSlot}
-          registration={form.register(`textValues.${eventSlot.key}`)}
+        <FormInput
+          control={form.control}
+          name={`textValues.${eventSlot.key}`}
+          label={eventSlot.label}
           isLoading={isLoading}
         />
       )}
 
       {otherSlots.map((slot) => (
-        <TextSlotField
+        <FormInput
           key={slot.key}
-          slot={slot}
-          registration={form.register(`textValues.${slot.key}`)}
+          control={form.control}
+          name={`textValues.${slot.key}`}
+          label={slot.label}
           isLoading={isLoading}
         />
       ))}
 
-      <Field>
-        <FieldLabel>{fi.teams.fields.roster}</FieldLabel>
-        <Controller
-          control={form.control}
-          name="athleteOrder"
-          render={({ field }) => (
-            <RosterPicker
-              athletes={athletes}
-              selected={field.value}
-              requiredCount={layout?.requiredAthleteCount ?? 0}
-              onChange={field.onChange}
-              isLoading={isLoading}
-            />
-          )}
-        />
-      </Field>
+      <FormBase
+        control={form.control}
+        name="athleteOrder"
+        label={fi.teams.fields.roster}
+      >
+        {(field) => (
+          <RosterPicker
+            athletes={athletes}
+            selected={field.value}
+            requiredCount={layout?.requiredAthleteCount ?? 0}
+            onChange={field.onChange}
+            isLoading={isLoading}
+          />
+        )}
+      </FormBase>
     </FieldGroup>
   )
 }
@@ -491,7 +497,6 @@ function FormActionsSection({
   error,
   isSaving,
   isLoading,
-  layout,
   templates,
   stageRef,
   fallbackName,
@@ -501,7 +506,6 @@ function FormActionsSection({
   error: string | null
   isSaving: boolean
   isLoading: boolean
-  layout: Layout | null
   templates: { _id: Id<"templates"> }[] | undefined
   stageRef: RefObject<Konva.Stage | null>
   fallbackName: string
@@ -510,15 +514,6 @@ function FormActionsSection({
   const { isDirty } = useFormState({ control })
   const name = useWatch({ control, name: "name" })
   const templateId = useWatch({ control, name: "templateId" })
-  const athleteOrder = useWatch({ control, name: "athleteOrder" })
-
-  const rosterComplete =
-    layout !== null &&
-    athleteOrder.length === layout.requiredAthleteCount &&
-    athleteOrder.every((id) => id !== null)
-  const nameNonEmpty = name.trim().length > 0
-  const canSave =
-    isDirty && rosterComplete && templateId !== null && nameNonEmpty
 
   const selectedTemplate = templates?.find((t) => t._id === templateId) ?? null
 
@@ -527,7 +522,7 @@ function FormActionsSection({
       error={error}
       isSaving={isSaving}
       isLoading={isLoading}
-      canSave={canSave}
+      canSave={isDirty}
       saveLabel={fi.teams.actions.save}
       onSave={onSave}
       extraButtons={

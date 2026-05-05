@@ -1,5 +1,6 @@
 "use client"
 
+import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery } from "convex/react"
 import type Konva from "konva"
 import { useRouter } from "next/navigation"
@@ -13,48 +14,59 @@ import {
 } from "react"
 import {
   type Control,
-  Controller,
   type UseFormReturn,
   useForm,
   useWatch,
 } from "react-hook-form"
+import { z } from "zod"
 import { FormActions } from "@/components/forms/form-actions"
 import { PageHeader } from "@/components/layout/page-header"
 import { ExportButton } from "@/components/team-image/export-button"
 import { ResponsiveTeamImageStage } from "@/components/team-image/team-image-stage"
 import { LayoutRadioGroup } from "@/components/teams/layout-radio-group"
 import { RosterPicker } from "@/components/teams/roster-picker"
-import { TemplateSelect } from "@/components/teams/template-select"
-import { TextSlotField } from "@/components/teams/text-slot-field"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { FieldGroup } from "@/components/ui/field"
+import { FormBase, FormInput, FormSelect } from "@/components/ui/form-fields"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { useOrderedAthletes } from "@/hooks/use-ordered-athletes"
-import { LAYOUTS, type Layout, type LayoutId } from "@/lib/layouts"
+import {
+  LAYOUT_IDS,
+  LAYOUTS,
+  type Layout,
+  type LayoutId,
+  withLayoutDefaults,
+} from "@/lib/layouts"
 import { fi } from "@/messages/fi"
 
 const DEFAULT_LAYOUT_ID: LayoutId = "relay3"
 const STAGE_DISPLAY_WIDTH = 540
 
-type FormValues = {
-  name: string
-  layoutId: LayoutId
-  templateId: Id<"templates"> | null
-  textValues: Record<string, string>
-  athleteOrder: (Id<"athletes"> | null)[]
-}
+const teamImageSchema = z
+  .object({
+    name: z.string().trim(),
+    layoutId: z.enum(LAYOUT_IDS as readonly [LayoutId, ...LayoutId[]]),
+    templateId: z
+      .custom<Id<"templates">>((v) => typeof v === "string" && v.length > 0)
+      .nullable(),
+    textValues: z.record(z.string(), z.string()),
+    athleteOrder: z.array(
+      z
+        .custom<Id<"athletes">>((v) => typeof v === "string" && v.length > 0)
+        .nullable()
+    ),
+  })
+  .superRefine((data, ctx) => {
+    if (data.templateId === null) {
+      ctx.addIssue({
+        code: "custom",
+        message: fi.teams.errors.templateRequired,
+        path: ["templateId"],
+      })
+    }
+  })
 
-function withLayoutDefaults(
-  layout: Layout,
-  stored: Record<string, string>
-): Record<string, string> {
-  const result: Record<string, string> = {}
-  for (const slot of layout.textSlots) {
-    if (slot.defaultValue) result[slot.key] = slot.defaultValue
-  }
-  return { ...result, ...stored }
-}
+type FormValues = z.infer<typeof teamImageSchema>
 
 export default function NewTeamImagePage() {
   const router = useRouter()
@@ -66,6 +78,7 @@ export default function NewTeamImagePage() {
   const [isSaving, setIsSaving] = useState(false)
 
   const form = useForm<FormValues>({
+    resolver: zodResolver(teamImageSchema),
     defaultValues: {
       name: "",
       layoutId: DEFAULT_LAYOUT_ID,
@@ -95,35 +108,17 @@ export default function NewTeamImagePage() {
   }
 
   const handleSave = form.handleSubmit(async (values) => {
+    if (!values.templateId) return
     setError(null)
-    if (!values.templateId) {
-      setError("Valitse malli.")
-      return
-    }
-    const required = LAYOUTS[values.layoutId].requiredAthleteCount
-    if (values.athleteOrder.some((id) => id === null)) {
-      const missing = values.athleteOrder.filter((id) => id === null).length
-      const remaining = required - values.athleteOrder.length
-      setError(fi.teams.errors.rosterIncomplete(missing + remaining))
-      return
-    }
-    if (values.athleteOrder.length < required) {
-      setError(
-        fi.teams.errors.rosterIncomplete(required - values.athleteOrder.length)
-      )
-      return
-    }
     const validIds = values.athleteOrder.filter(
       (id): id is Id<"athletes"> => id !== null
     )
-
     setIsSaving(true)
     try {
       const created = await createTeamImage({
         templateId: values.templateId,
         layoutId: values.layoutId,
-        name:
-          values.name.trim() || `${fi.layouts[values.layoutId]} ${Date.now()}`,
+        name: values.name || `${fi.layouts[values.layoutId]} ${Date.now()}`,
         athleteOrder: validIds,
         textValues: values.textValues,
       })
@@ -194,65 +189,75 @@ function FormFields({
   const eventSlot = layout.textSlots.find((s) => s.key === "eventName")
   const otherSlots = layout.textSlots.filter((s) => s.key !== "eventName")
 
+  const isEmpty = templates !== undefined && templates.length === 0
+  const templatePlaceholder =
+    templates === undefined
+      ? fi.common.loading
+      : isEmpty
+        ? fi.templates.empty
+        : fi.teams.fields.template
+
   return (
     <FieldGroup>
-      <Field>
-        <FieldLabel htmlFor="team-image-name">
-          {fi.teams.fields.name}
-        </FieldLabel>
-        <Input id="team-image-name" {...form.register("name")} />
-      </Field>
-
-      <Controller
+      <FormInput
         control={form.control}
-        name="layoutId"
-        render={({ field }) => (
-          <LayoutRadioGroup value={field.value} onChange={onLayoutChange} />
-        )}
+        name="name"
+        label={fi.teams.fields.name}
       />
 
-      <Controller
+      <FormBase
+        control={form.control}
+        name="layoutId"
+        label={fi.teams.fields.layout}
+      >
+        {(field) => (
+          <LayoutRadioGroup value={field.value} onChange={onLayoutChange} />
+        )}
+      </FormBase>
+
+      <FormSelect
         control={form.control}
         name="templateId"
-        render={({ field }) => (
-          <TemplateSelect
-            templates={templates}
-            value={field.value}
-            onChange={field.onChange}
-          />
-        )}
+        label={fi.teams.fields.template}
+        placeholder={templatePlaceholder}
+        disabled={templates === undefined || isEmpty}
+        options={(templates ?? []).map((template) => ({
+          value: template._id,
+          label: template.name,
+        }))}
       />
 
       {eventSlot && (
-        <TextSlotField
-          slot={eventSlot}
-          registration={form.register(`textValues.${eventSlot.key}`)}
+        <FormInput
+          control={form.control}
+          name={`textValues.${eventSlot.key}`}
+          label={eventSlot.label}
         />
       )}
 
       {otherSlots.map((slot) => (
-        <TextSlotField
+        <FormInput
           key={slot.key}
-          slot={slot}
-          registration={form.register(`textValues.${slot.key}`)}
+          control={form.control}
+          name={`textValues.${slot.key}`}
+          label={slot.label}
         />
       ))}
 
-      <Field>
-        <FieldLabel>{fi.teams.fields.roster}</FieldLabel>
-        <Controller
-          control={form.control}
-          name="athleteOrder"
-          render={({ field }) => (
-            <RosterPicker
-              athletes={athletes}
-              selected={field.value}
-              requiredCount={layout.requiredAthleteCount}
-              onChange={field.onChange}
-            />
-          )}
-        />
-      </Field>
+      <FormBase
+        control={form.control}
+        name="athleteOrder"
+        label={fi.teams.fields.roster}
+      >
+        {(field) => (
+          <RosterPicker
+            athletes={athletes}
+            selected={field.value}
+            requiredCount={layout.requiredAthleteCount}
+            onChange={field.onChange}
+          />
+        )}
+      </FormBase>
     </FieldGroup>
   )
 }
@@ -314,12 +319,6 @@ function FormActionsSection({
 }) {
   const name = useWatch({ control, name: "name" })
   const templateId = useWatch({ control, name: "templateId" })
-  const athleteOrder = useWatch({ control, name: "athleteOrder" })
-
-  const rosterComplete =
-    athleteOrder.length === layout.requiredAthleteCount &&
-    athleteOrder.every((id) => id !== null)
-  const canSave = rosterComplete && templateId !== null
 
   const selectedTemplate = templates?.find((t) => t._id === templateId) ?? null
 
@@ -327,7 +326,7 @@ function FormActionsSection({
     <FormActions
       error={error}
       isSaving={isSaving}
-      canSave={canSave}
+      canSave={true}
       saveLabel={fi.teams.actions.save}
       onSave={onSave}
       extraButtons={
