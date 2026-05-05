@@ -3,7 +3,21 @@
 import { useMutation, useQuery } from "convex/react"
 import type Konva from "konva"
 import { useRouter } from "next/navigation"
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react"
+import {
+  type RefObject,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import {
+  type Control,
+  Controller,
+  type UseFormReturn,
+  useForm,
+  useWatch,
+} from "react-hook-form"
 import { FormActions } from "@/components/forms/form-actions"
 import { PageHeader } from "@/components/layout/page-header"
 import { ExportButton } from "@/components/team-image/export-button"
@@ -15,94 +29,103 @@ import { TextSlotField } from "@/components/teams/text-slot-field"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { api } from "@/convex/_generated/api"
-import type { Id } from "@/convex/_generated/dataModel"
+import type { Doc, Id } from "@/convex/_generated/dataModel"
 import { useOrderedAthletes } from "@/hooks/use-ordered-athletes"
-import { LAYOUTS, type LayoutId } from "@/lib/layouts"
+import { LAYOUTS, type Layout, type LayoutId } from "@/lib/layouts"
 import { fi } from "@/messages/fi"
+
+const DEFAULT_LAYOUT_ID: LayoutId = "relay3"
+const STAGE_DISPLAY_WIDTH = 540
+
+type FormValues = {
+  name: string
+  layoutId: LayoutId
+  templateId: Id<"templates"> | null
+  textValues: Record<string, string>
+  athleteOrder: (Id<"athletes"> | null)[]
+}
+
+function withLayoutDefaults(
+  layout: Layout,
+  stored: Record<string, string>
+): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const slot of layout.textSlots) {
+    if (slot.defaultValue) result[slot.key] = slot.defaultValue
+  }
+  return { ...result, ...stored }
+}
 
 export default function NewTeamImagePage() {
   const router = useRouter()
   const createTeamImage = useMutation(api.teamImages.create)
+  const athletes = useQuery(api.athletes.list, {})
 
   const stageRef = useRef<Konva.Stage>(null)
-  const [layoutId, setLayoutId] = useState<LayoutId>("relay3")
-  const [templateId, setTemplateId] = useState<Id<"templates"> | null>(null)
-  const [name, setName] = useState("")
-  const [textValues, setTextValues] = useState<Record<string, string>>({})
-  const [athleteOrder, setAthleteOrder] = useState<(Id<"athletes"> | null)[]>(
-    []
-  )
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
+  const form = useForm<FormValues>({
+    defaultValues: {
+      name: "",
+      layoutId: DEFAULT_LAYOUT_ID,
+      templateId: null,
+      textValues: withLayoutDefaults(LAYOUTS[DEFAULT_LAYOUT_ID], {}),
+      athleteOrder: [],
+    },
+  })
+
+  const layoutId = useWatch({ control: form.control, name: "layoutId" })
   const layout = LAYOUTS[layoutId]
   const templates = useQuery(api.templates.list, { aspect: layout.aspect })
-  const athletes = useQuery(api.athletes.list, {})
-
-  const selectedTemplate = useMemo(() => {
-    if (!templateId || !templates) return null
-    return templates.find((t) => t._id === templateId) ?? null
-  }, [templateId, templates])
 
   useEffect(() => {
-    if (templateId === null && templates && templates.length > 0) {
-      setTemplateId(templates[0]._id)
-    }
-  }, [templates, templateId])
-
-  const deferredTextValues = useDeferredValue(textValues)
-  // Preserve positional alignment: index N here MUST match slot index N in
-  // the layout. Empty slots stay null so the stage skips them without
-  // shifting later athletes leftward.
-  const orderedAthletes = useOrderedAthletes(athleteOrder, athletes)
-
-  const rosterComplete =
-    athleteOrder.length === layout.requiredAthleteCount &&
-    athleteOrder.every((id) => id !== null)
-  const canSave = rosterComplete && templateId !== null
-
-  const eventSlot = layout.textSlots.find((s) => s.key === "eventName")
-  const otherSlots = layout.textSlots.filter((s) => s.key !== "eventName")
+    if (!templates || templates.length === 0) return
+    if (form.getValues("templateId") !== null) return
+    form.setValue("templateId", templates[0]._id, { shouldDirty: false })
+  }, [templates, form])
 
   function handleLayoutChange(value: LayoutId) {
-    setLayoutId(value)
-    setTemplateId(null)
-    setAthleteOrder([])
+    if (value === layoutId) return
+    form.setValue("layoutId", value)
+    form.setValue("templateId", null)
+    form.setValue("athleteOrder", [])
+    const currentText = form.getValues("textValues")
+    form.setValue("textValues", withLayoutDefaults(LAYOUTS[value], currentText))
   }
 
-  async function handleSave() {
+  const handleSave = form.handleSubmit(async (values) => {
     setError(null)
-    if (!templateId) {
+    if (!values.templateId) {
       setError("Valitse malli.")
       return
     }
-    if (athleteOrder.some((id) => id === null)) {
-      const missing = athleteOrder.filter((id) => id === null).length
-      const remaining = layout.requiredAthleteCount - athleteOrder.length
+    const required = LAYOUTS[values.layoutId].requiredAthleteCount
+    if (values.athleteOrder.some((id) => id === null)) {
+      const missing = values.athleteOrder.filter((id) => id === null).length
+      const remaining = required - values.athleteOrder.length
       setError(fi.teams.errors.rosterIncomplete(missing + remaining))
       return
     }
-    if (athleteOrder.length < layout.requiredAthleteCount) {
+    if (values.athleteOrder.length < required) {
       setError(
-        fi.teams.errors.rosterIncomplete(
-          layout.requiredAthleteCount - athleteOrder.length
-        )
+        fi.teams.errors.rosterIncomplete(required - values.athleteOrder.length)
       )
       return
     }
-
-    const validIds = athleteOrder.filter(
+    const validIds = values.athleteOrder.filter(
       (id): id is Id<"athletes"> => id !== null
     )
 
     setIsSaving(true)
     try {
       const created = await createTeamImage({
-        templateId,
-        layoutId,
-        name: name.trim() || `${fi.layouts[layoutId]} ${Date.now()}`,
+        templateId: values.templateId,
+        layoutId: values.layoutId,
+        name:
+          values.name.trim() || `${fi.layouts[values.layoutId]} ${Date.now()}`,
         athleteOrder: validIds,
-        textValues,
+        textValues: values.textValues,
       })
       router.push(`/teams/${created}`)
     } catch (caught) {
@@ -112,7 +135,7 @@ export default function NewTeamImagePage() {
     } finally {
       setIsSaving(false)
     }
-  }
+  })
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,84 +146,197 @@ export default function NewTeamImagePage() {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="flex flex-col gap-6">
-          <FieldGroup>
-            {eventSlot && (
-              <TextSlotField
-                slot={eventSlot}
-                values={textValues}
-                setValues={setTextValues}
-              />
-            )}
+          <FormFields
+            form={form}
+            layout={layout}
+            templates={templates}
+            athletes={athletes}
+            onLayoutChange={handleLayoutChange}
+          />
 
-            <LayoutRadioGroup value={layoutId} onChange={handleLayoutChange} />
-
-            <TemplateSelect
-              templates={templates}
-              value={templateId}
-              onChange={setTemplateId}
-            />
-
-            <Field>
-              <FieldLabel htmlFor="team-image-name">
-                {fi.teams.fields.name}
-              </FieldLabel>
-              <Input
-                id="team-image-name"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-              />
-            </Field>
-
-            {otherSlots.map((slot) => (
-              <TextSlotField
-                key={slot.key}
-                slot={slot}
-                values={textValues}
-                setValues={setTextValues}
-              />
-            ))}
-
-            <Field>
-              <FieldLabel>{fi.teams.fields.roster}</FieldLabel>
-              <RosterPicker
-                athletes={athletes}
-                selected={athleteOrder}
-                requiredCount={layout.requiredAthleteCount}
-                onChange={setAthleteOrder}
-              />
-            </Field>
-          </FieldGroup>
-
-          <FormActions
+          <FormActionsSection
+            control={form.control}
             error={error}
             isSaving={isSaving}
-            canSave={canSave}
-            saveLabel={fi.teams.actions.save}
+            layout={layout}
+            templates={templates}
+            stageRef={stageRef}
             onSave={handleSave}
-            extraButtons={
-              <ExportButton
-                stageRef={stageRef}
-                filename={(name.trim() || fi.layouts[layoutId]).replace(
-                  /\s+/g,
-                  "_"
-                )}
-                disabled={!selectedTemplate}
-              />
-            }
           />
         </div>
 
         <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
-          <ResponsiveTeamImageStage
+          <StageSection
+            control={form.control}
+            templates={templates}
+            athletes={athletes}
             stageRef={stageRef}
-            layout={layout}
-            backgroundUrl={selectedTemplate?.backgroundUrl ?? null}
-            athletes={orderedAthletes}
-            textValues={deferredTextValues}
-            maxWidth={540}
           />
         </div>
       </div>
     </div>
+  )
+}
+
+function FormFields({
+  form,
+  layout,
+  templates,
+  athletes,
+  onLayoutChange,
+}: {
+  form: UseFormReturn<FormValues>
+  layout: Layout
+  templates: { _id: Id<"templates">; name: string }[] | undefined
+  athletes: (Doc<"athletes"> & { imageUrl: string | null })[] | undefined
+  onLayoutChange: (value: LayoutId) => void
+}) {
+  const eventSlot = layout.textSlots.find((s) => s.key === "eventName")
+  const otherSlots = layout.textSlots.filter((s) => s.key !== "eventName")
+
+  return (
+    <FieldGroup>
+      <Field>
+        <FieldLabel htmlFor="team-image-name">
+          {fi.teams.fields.name}
+        </FieldLabel>
+        <Input id="team-image-name" {...form.register("name")} />
+      </Field>
+
+      <Controller
+        control={form.control}
+        name="layoutId"
+        render={({ field }) => (
+          <LayoutRadioGroup value={field.value} onChange={onLayoutChange} />
+        )}
+      />
+
+      <Controller
+        control={form.control}
+        name="templateId"
+        render={({ field }) => (
+          <TemplateSelect
+            templates={templates}
+            value={field.value}
+            onChange={field.onChange}
+          />
+        )}
+      />
+
+      {eventSlot && (
+        <TextSlotField
+          slot={eventSlot}
+          registration={form.register(`textValues.${eventSlot.key}`)}
+        />
+      )}
+
+      {otherSlots.map((slot) => (
+        <TextSlotField
+          key={slot.key}
+          slot={slot}
+          registration={form.register(`textValues.${slot.key}`)}
+        />
+      ))}
+
+      <Field>
+        <FieldLabel>{fi.teams.fields.roster}</FieldLabel>
+        <Controller
+          control={form.control}
+          name="athleteOrder"
+          render={({ field }) => (
+            <RosterPicker
+              athletes={athletes}
+              selected={field.value}
+              requiredCount={layout.requiredAthleteCount}
+              onChange={field.onChange}
+            />
+          )}
+        />
+      </Field>
+    </FieldGroup>
+  )
+}
+
+function StageSection({
+  control,
+  templates,
+  athletes,
+  stageRef,
+}: {
+  control: Control<FormValues>
+  templates:
+    | { _id: Id<"templates">; backgroundUrl: string | null }[]
+    | undefined
+  athletes: (Doc<"athletes"> & { imageUrl: string | null })[] | undefined
+  stageRef: RefObject<Konva.Stage | null>
+}) {
+  const layoutId = useWatch({ control, name: "layoutId" })
+  const templateId = useWatch({ control, name: "templateId" })
+  const textValues = useWatch({ control, name: "textValues" })
+  const athleteOrder = useWatch({ control, name: "athleteOrder" })
+
+  const layout = LAYOUTS[layoutId]
+  const selectedTemplate = useMemo(() => {
+    if (!templateId || !templates) return null
+    return templates.find((t) => t._id === templateId) ?? null
+  }, [templateId, templates])
+  const orderedAthletes = useOrderedAthletes(athleteOrder ?? [], athletes)
+  const deferredTextValues = useDeferredValue(textValues ?? {})
+
+  return (
+    <ResponsiveTeamImageStage
+      stageRef={stageRef}
+      layout={layout}
+      backgroundUrl={selectedTemplate?.backgroundUrl ?? null}
+      athletes={orderedAthletes}
+      textValues={deferredTextValues}
+      maxWidth={STAGE_DISPLAY_WIDTH}
+    />
+  )
+}
+
+function FormActionsSection({
+  control,
+  error,
+  isSaving,
+  layout,
+  templates,
+  stageRef,
+  onSave,
+}: {
+  control: Control<FormValues>
+  error: string | null
+  isSaving: boolean
+  layout: Layout
+  templates: { _id: Id<"templates"> }[] | undefined
+  stageRef: RefObject<Konva.Stage | null>
+  onSave: () => void
+}) {
+  const name = useWatch({ control, name: "name" })
+  const templateId = useWatch({ control, name: "templateId" })
+  const athleteOrder = useWatch({ control, name: "athleteOrder" })
+
+  const rosterComplete =
+    athleteOrder.length === layout.requiredAthleteCount &&
+    athleteOrder.every((id) => id !== null)
+  const canSave = rosterComplete && templateId !== null
+
+  const selectedTemplate = templates?.find((t) => t._id === templateId) ?? null
+
+  return (
+    <FormActions
+      error={error}
+      isSaving={isSaving}
+      canSave={canSave}
+      saveLabel={fi.teams.actions.save}
+      onSave={onSave}
+      extraButtons={
+        <ExportButton
+          stageRef={stageRef}
+          filename={(name.trim() || fi.layouts[layout.id]).replace(/\s+/g, "_")}
+          disabled={!selectedTemplate}
+        />
+      }
+    />
   )
 }

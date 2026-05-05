@@ -120,14 +120,20 @@ export function TeamImageStagePlaceholder({
   aspectRatio: number
   className?: string
 }) {
+  // Wrappers mirror `ResponsiveTeamImageStage` so the column doesn't shift
+  // when the real stage replaces the placeholder.
   return (
-    <div
-      style={{ width, height: width / aspectRatio }}
-      className={cn(
-        "animate-pulse overflow-hidden rounded-lg border bg-muted shadow-sm",
-        className
-      )}
-    />
+    <div className="w-full min-w-0">
+      <div className="lg:ml-auto lg:w-fit">
+        <div
+          style={{ width, height: width / aspectRatio }}
+          className={cn(
+            "animate-pulse overflow-hidden rounded-lg border bg-muted shadow-sm",
+            className
+          )}
+        />
+      </div>
+    </div>
   )
 }
 
