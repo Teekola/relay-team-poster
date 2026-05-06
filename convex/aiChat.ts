@@ -60,6 +60,13 @@ const CLARIFICATION_QUESTIONS: Record<ClarificationField, string> = {
   teamName: "Mikä on joukkueen nimi? (esim. Angelniemen Ankkuri 1)",
 }
 
+const DEFAULT_GEMINI_MODEL = "gemini-3.1-flash-lite-preview"
+const DEFAULT_GEMINI_FALLBACK_MODELS = [
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash-lite",
+  "gemini-2.0-flash",
+] as const
+
 function pickClarifications(
   plan: Plan,
   asked: ReadonlySet<string>
@@ -109,19 +116,13 @@ export const planTeam = action({
 
     let raw: RawPlan
     try {
-      const result = await generateText({
-        model: google(process.env.GEMINI_MODEL ?? "gemini-2.5-flash-lite"),
-        output: Output.object({ schema: rawPlanSchema }),
-        system: PLANNER_SYSTEM_PROMPT,
-        prompt: buildPlannerUserPrompt({
-          message,
-          roster,
-          clarificationAnswers: args.clarificationAnswers,
-          previousPlan: args.previousPlan,
-          correction: args.correction,
-        }),
+      raw = await generatePlanWithFallbacks({
+        message,
+        roster,
+        clarificationAnswers: args.clarificationAnswers,
+        previousPlan: args.previousPlan,
+        correction: args.correction,
       })
-      raw = result.output
     } catch (caught) {
       const reason =
         caught instanceof Error ? caught.message : "Tuntematon virhe"
@@ -148,12 +149,65 @@ export const planTeam = action({
   },
 })
 
+async function generatePlanWithFallbacks(args: {
+  message: string
+  roster: RosterEntry[]
+  clarificationAnswers?: Record<string, string>
+  previousPlan?: Plan
+  correction?: string
+}): Promise<RawPlan> {
+  const prompt = buildPlannerUserPrompt(args)
+  const models = getGeminiModelIds()
+  let lastError: unknown
+
+  for (const [index, modelId] of models.entries()) {
+    try {
+      const result = await generateText({
+        model: google(modelId),
+        output: Output.object({ schema: rawPlanSchema }),
+        system: PLANNER_SYSTEM_PROMPT,
+        prompt,
+      })
+      return result.output
+    } catch (caught) {
+      lastError = caught
+      const reason =
+        caught instanceof Error ? caught.message : "Tuntematon virhe"
+      const nextModel = models[index + 1]
+      if (!nextModel || !isRetryableRateLimitError(reason)) break
+      console.warn(
+        `Gemini model ${modelId} was rate-limited; retrying with ${nextModel}.`
+      )
+    }
+  }
+
+  throw lastError ?? new Error("AI-pyyntö epäonnistui.")
+}
+
+function getGeminiModelIds(): string[] {
+  const fallbackModels =
+    process.env.GEMINI_FALLBACK_MODELS?.split(",")
+      .map((model) => model.trim())
+      .filter((model) => model.length > 0) ?? DEFAULT_GEMINI_FALLBACK_MODELS
+  const configuredModels = [
+    process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+    ...fallbackModels,
+  ]
+
+  return Array.from(new Set(configuredModels))
+}
+
 function formatAiError(reason: string): string {
-  const retrySeconds = reason.match(/retry in ([\d.]+)s/i)?.[1]
-  if (
-    retrySeconds ||
-    /quota exceeded|rate limit|too many requests/i.test(reason)
-  ) {
+  if (isDailyQuotaError(reason)) {
+    return "AI:n päivittäinen käyttöraja tuli vastaan. Yritä uudelleen, kun kiintiö nollautuu."
+  }
+
+  const retrySeconds = getRetrySeconds(reason)
+  if (/quota exceeded/i.test(reason)) {
+    return "AI:n käyttöraja tuli vastaan. Yritä myöhemmin uudelleen."
+  }
+
+  if (retrySeconds || isRetryableRateLimitError(reason)) {
     const roundedSeconds = retrySeconds ? Math.ceil(Number(retrySeconds)) : null
     return roundedSeconds
       ? `AI:n käyttöraja tuli vastaan. Yritä uudelleen ${roundedSeconds} sekunnin kuluttua.`
@@ -165,6 +219,27 @@ function formatAiError(reason: string): string {
   }
 
   return "AI-pyyntö epäonnistui. Yritä hetken kuluttua uudelleen."
+}
+
+function isRetryableRateLimitError(reason: string): boolean {
+  return getRetrySeconds(reason) !== null || isRateLimitError(reason)
+}
+
+function isRateLimitError(reason: string): boolean {
+  return /quota exceeded|rate limit|too many requests|resource_exhausted/i.test(
+    reason
+  )
+}
+
+function getRetrySeconds(reason: string): number | null {
+  const value = reason.match(/retry in ([\d.]+)s/i)?.[1]
+  return value ? Number(value) : null
+}
+
+function isDailyQuotaError(reason: string): boolean {
+  return /requests per day|per day|per[_\s-]*day|rpd|daily|generaterequestsperday/i.test(
+    reason
+  )
 }
 
 function coercePlan(raw: RawPlan): Plan {
