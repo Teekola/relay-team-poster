@@ -152,7 +152,7 @@ type AthleteCardProps = {
   imageUrl: string | null
   imageWidth: number | undefined
   imageHeight: number | undefined
-  crop: { x: number; y: number; width: number; height: number }
+  crop: { x: number; y: number; width: number; height: number } | undefined
 }
 
 function AthleteCardSkeleton() {
@@ -255,7 +255,7 @@ function PortraitPreview({
   imageHeight,
 }: {
   imageUrl: string | null
-  crop: { x: number; y: number; width: number; height: number }
+  crop: { x: number; y: number; width: number; height: number } | undefined
   alt: string
   imageWidth: number | undefined
   imageHeight: number | undefined
@@ -265,7 +265,7 @@ function PortraitPreview({
   const naturalW = imageWidth ?? detected?.w
   const naturalH = imageHeight ?? detected?.h
 
-  if (!imageUrl) {
+  if (!imageUrl || !crop) {
     return <div className="aspect-4/5 w-full bg-muted" />
   }
   if (!naturalW || !naturalH) {

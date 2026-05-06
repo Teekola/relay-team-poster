@@ -7,6 +7,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react"
 import { cacheLife, cacheTag } from "next/cache"
 import Link from "next/link"
+import { AiChatPanel } from "@/components/teams/ai-chat-panel"
 import { buttonVariants } from "@/components/ui/button"
 import {
   Item,
@@ -45,6 +46,8 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-8">
       <h1 className="font-medium text-2xl">{fi.dashboard.title}</h1>
+
+      <AiChatPanel />
 
       <div className="flex flex-wrap gap-2">
         {SECTIONS.map(({ newHref, copy }) => (

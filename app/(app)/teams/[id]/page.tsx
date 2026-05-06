@@ -4,19 +4,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery } from "convex/react"
 import type Konva from "konva"
 import { notFound, useParams, useRouter } from "next/navigation"
-import {
-  type RefObject,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
-import {
-  type Control,
-  useForm,
-  useFormState,
-  useWatch,
-} from "react-hook-form"
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react"
+import { type Control, useForm, useFormState, useWatch } from "react-hook-form"
 import { FormActions } from "@/components/forms/form-actions"
 import { PageHeader } from "@/components/layout/page-header"
 import { ExportButton } from "@/components/team-image/export-button"

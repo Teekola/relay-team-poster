@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as aiChat from "../aiChat.js";
 import type * as athletes from "../athletes.js";
 import type * as auth from "../auth.js";
 import type * as files from "../files.js";
@@ -24,6 +25,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  aiChat: typeof aiChat;
   athletes: typeof athletes;
   auth: typeof auth;
   files: typeof files;

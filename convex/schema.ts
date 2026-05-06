@@ -21,15 +21,20 @@ export default defineSchema({
   athletes: defineTable({
     clubId: v.id("clubs"),
     name: v.string(),
-    imageStorageId: v.id("_storage"),
+    nickname: v.optional(v.string()),
+    // Image fields are optional so the AI flow can create placeholder
+    // athletes without a photo; renderer falls back to a grey box.
+    imageStorageId: v.optional(v.id("_storage")),
     imageWidth: v.optional(v.number()),
     imageHeight: v.optional(v.number()),
-    crop: v.object({
-      x: v.number(),
-      y: v.number(),
-      width: v.number(),
-      height: v.number(),
-    }),
+    crop: v.optional(
+      v.object({
+        x: v.number(),
+        y: v.number(),
+        width: v.number(),
+        height: v.number(),
+      })
+    ),
     gender: v.union(v.literal("M"), v.literal("W")),
     active: v.boolean(),
   })

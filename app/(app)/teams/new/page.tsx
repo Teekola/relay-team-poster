@@ -3,8 +3,8 @@
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery } from "convex/react"
 import type Konva from "konva"
-import { useRouter } from "next/navigation"
-import { type RefObject, useEffect, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react"
 import { type Control, useForm, useWatch } from "react-hook-form"
 import { FormActions } from "@/components/forms/form-actions"
 import { PageHeader } from "@/components/layout/page-header"
@@ -13,11 +13,8 @@ import { TeamImageFormFields } from "@/components/teams/team-image-form-fields"
 import { TeamImageStageSection } from "@/components/teams/team-image-stage-section"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import {
-  LAYOUTS,
-  type LayoutId,
-  withLayoutDefaults,
-} from "@/lib/layouts"
+import { LAYOUTS, type LayoutId, withLayoutDefaults } from "@/lib/layouts"
+import { useTeamDraftStore } from "@/lib/store/team-draft-store"
 import {
   DEFAULT_LAYOUT_ID,
   teamImageFormSchema,
@@ -27,27 +24,47 @@ import { fi } from "@/messages/fi"
 
 export default function NewTeamImagePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const createTeamImage = useMutation(api.teamImages.create)
   const athletes = useQuery(api.athletes.list, {})
+  const draft = useTeamDraftStore((s) => s.draft)
+  const clearDraft = useTeamDraftStore((s) => s.clearDraft)
+  const shouldUseDraft = searchParams.get("draft") === "ai"
 
   const stageRef = useRef<Konva.Stage>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  const form = useForm<TeamImageFormValues>({
-    resolver: zodResolver(teamImageFormSchema),
-    defaultValues: {
+  const emptyDefaults = useMemo<TeamImageFormValues>(
+    () => ({
       name: "",
       layoutId: DEFAULT_LAYOUT_ID,
       templateId: null,
       textValues: withLayoutDefaults(LAYOUTS[DEFAULT_LAYOUT_ID], {}),
       athleteOrder: [],
-    },
+    }),
+    []
+  )
+
+  const form = useForm<TeamImageFormValues>({
+    resolver: zodResolver(teamImageFormSchema),
+    defaultValues: shouldUseDraft ? (draft ?? emptyDefaults) : emptyDefaults,
   })
 
   const layoutId = useWatch({ control: form.control, name: "layoutId" })
   const layout = layoutId ? LAYOUTS[layoutId] : LAYOUTS[DEFAULT_LAYOUT_ID]
   const templates = useQuery(api.templates.list, { aspect: layout.aspect })
+
+  useEffect(() => {
+    if (!draft) return
+    if (!shouldUseDraft) {
+      clearDraft()
+      return
+    }
+    form.reset(draft)
+    clearDraft()
+    router.replace("/teams/new")
+  }, [draft, shouldUseDraft, clearDraft, form, router])
 
   useEffect(() => {
     if (!templates || templates.length === 0) return

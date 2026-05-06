@@ -40,6 +40,7 @@ type Props = {
 
 const athleteSchema = z.object({
   name: z.string().min(1, fi.common.requiredField),
+  nickname: z.string().trim().max(80).optional(),
   gender: z.enum(["M", "W"]),
 })
 
@@ -67,12 +68,16 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
 
   const formValues = useMemo<FormValues | undefined>(() => {
     if (!athlete) return undefined
-    return { name: athlete.name, gender: athlete.gender }
+    return {
+      name: athlete.name,
+      nickname: athlete.nickname ?? "",
+      gender: athlete.gender,
+    }
   }, [athlete])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(athleteSchema),
-    defaultValues: { name: "", gender: "M" },
+    defaultValues: { name: "", nickname: "", gender: "M" },
     values: formValues,
     resetOptions: { keepDirtyValues: true },
   })
@@ -89,7 +94,7 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
   }, [watchedName, onNameChange])
 
   useEffect(() => {
-    if (athlete) setCrop(athlete.crop)
+    if (athlete) setCrop(athlete.crop ?? null)
   }, [athlete])
 
   function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -121,7 +126,9 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
       setError("Lataa valokuva.")
       return
     }
-    if (!crop) {
+    // Placeholder athletes have no image yet — editing other fields shouldn't demand a crop.
+    const willHaveImage = pendingPhoto !== null || Boolean(athlete?.imageUrl)
+    if (willHaveImage && !crop) {
       setError("Säädä rajaus.")
       return
     }
@@ -135,8 +142,10 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
         await updateAthlete({
           id: athlete._id,
           name: values.name,
+          // Always send so clearing the input clears the stored value.
+          nickname: values.nickname ?? "",
           gender: values.gender,
-          crop,
+          ...(crop ? { crop } : {}),
           ...(storageId
             ? {
                 imageStorageId: storageId,
@@ -146,13 +155,14 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
             : {}),
         })
       } else {
-        if (!pendingPhoto) {
+        if (!pendingPhoto || !crop) {
           setError("Lataa valokuva.")
           return
         }
         const storageId = await uploadFile(pendingPhoto.file)
         await createAthlete({
           name: values.name,
+          nickname: values.nickname,
           gender: values.gender,
           imageStorageId: storageId,
           imageWidth: pendingPhoto.naturalWidth,
@@ -175,7 +185,8 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
   const cropChanged =
     athlete !== null &&
     crop !== null &&
-    (crop.x !== athlete.crop.x ||
+    (athlete.crop === undefined ||
+      crop.x !== athlete.crop.x ||
       crop.y !== athlete.crop.y ||
       crop.width !== athlete.crop.width ||
       crop.height !== athlete.crop.height)
@@ -202,6 +213,14 @@ export function AthleteForm({ athlete, isLoading, onNameChange }: Props) {
           control={form.control}
           name="name"
           label={fi.athletes.fields.name}
+          isLoading={isLoading}
+        />
+
+        <FormInput
+          control={form.control}
+          name="nickname"
+          label={fi.athletes.fields.nickname}
+          description={fi.athletes.fields.nicknameHint}
           isLoading={isLoading}
         />
 

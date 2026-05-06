@@ -46,7 +46,9 @@ async function withImageUrls(
   return Promise.all(
     athletes.map(async (athlete) => ({
       ...athlete,
-      imageUrl: await ctx.storage.getUrl(athlete.imageStorageId),
+      imageUrl: athlete.imageStorageId
+        ? await ctx.storage.getUrl(athlete.imageStorageId)
+        : null,
       referenceCount: counts.get(athlete._id) ?? 0,
     }))
   )
@@ -90,15 +92,24 @@ export const get = query({
     const counts = await buildReferenceCounts(ctx, clubId)
     return {
       ...athlete,
-      imageUrl: await ctx.storage.getUrl(athlete.imageStorageId),
+      imageUrl: athlete.imageStorageId
+        ? await ctx.storage.getUrl(athlete.imageStorageId)
+        : null,
       referenceCount: counts.get(athlete._id) ?? 0,
     }
   },
 })
 
+function normalizeNickname(raw: string | undefined): string | undefined {
+  if (raw === undefined) return undefined
+  const trimmed = raw.trim()
+  return trimmed.length === 0 ? undefined : trimmed
+}
+
 export const create = mutation({
   args: {
     name: v.string(),
+    nickname: v.optional(v.string()),
     imageStorageId: v.id("_storage"),
     imageWidth: v.number(),
     imageHeight: v.number(),
@@ -114,6 +125,7 @@ export const create = mutation({
     return await ctx.db.insert("athletes", {
       clubId,
       name: trimmedName,
+      nickname: normalizeNickname(args.nickname),
       imageStorageId: args.imageStorageId,
       imageWidth: args.imageWidth,
       imageHeight: args.imageHeight,
@@ -124,10 +136,33 @@ export const create = mutation({
   },
 })
 
+export const createPlaceholder = mutation({
+  args: {
+    name: v.string(),
+    nickname: v.optional(v.string()),
+    gender: v.optional(genderValidator),
+  },
+  handler: async (ctx, args) => {
+    const { clubId } = await requireClubMember(ctx)
+    const trimmedName = args.name.trim()
+    if (trimmedName.length === 0) {
+      throw new ConvexError("Nimi ei voi olla tyhjä.")
+    }
+    return await ctx.db.insert("athletes", {
+      clubId,
+      name: trimmedName,
+      nickname: normalizeNickname(args.nickname),
+      gender: args.gender ?? "M",
+      active: true,
+    })
+  },
+})
+
 export const update = mutation({
   args: {
     id: v.id("athletes"),
     name: v.optional(v.string()),
+    nickname: v.optional(v.string()),
     imageStorageId: v.optional(v.id("_storage")),
     imageWidth: v.optional(v.number()),
     imageHeight: v.optional(v.number()),
@@ -149,6 +184,9 @@ export const update = mutation({
       }
       patch.name = trimmed
     }
+    if (args.nickname !== undefined) {
+      patch.nickname = normalizeNickname(args.nickname)
+    }
     if (args.crop !== undefined) patch.crop = args.crop
     if (args.gender !== undefined) patch.gender = args.gender
     if (args.imageWidth !== undefined) patch.imageWidth = args.imageWidth
@@ -161,7 +199,9 @@ export const update = mutation({
       const oldImageId = existing.imageStorageId
       patch.imageStorageId = args.imageStorageId
       await ctx.db.patch(args.id, patch)
-      await ctx.storage.delete(oldImageId)
+      if (oldImageId) {
+        await ctx.storage.delete(oldImageId)
+      }
       return args.id
     }
 
@@ -232,7 +272,30 @@ export const remove = mutation({
 
     const imageStorageId = athlete.imageStorageId
     await ctx.db.delete(id)
-    await ctx.storage.delete(imageStorageId)
+    if (imageStorageId) {
+      await ctx.storage.delete(imageStorageId)
+    }
     return id
+  },
+})
+
+// Minimal roster sent into the AI prompt — full `list` would drag image
+// metadata into the LLM context for no reason.
+export const listForClubMinimal = query({
+  args: {},
+  handler: async (ctx) => {
+    const { clubId } = await requireClubMember(ctx)
+    const athletes = await ctx.db
+      .query("athletes")
+      .withIndex("by_club_and_active", (q) =>
+        q.eq("clubId", clubId).eq("active", true)
+      )
+      .take(500)
+    return athletes.map((athlete) => ({
+      _id: athlete._id,
+      name: athlete.name,
+      nickname: athlete.nickname,
+      gender: athlete.gender,
+    }))
   },
 })
