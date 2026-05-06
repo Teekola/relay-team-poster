@@ -1,4 +1,5 @@
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server"
+import { Suspense } from "react"
 
 import "./globals.css"
 import { ConvexClientProvider } from "@/app/ConvexClientProvider"
@@ -12,23 +13,25 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ConvexAuthNextjsServerProvider>
-      <html
-        lang="fi"
-        suppressHydrationWarning
-        className={cn(
-          "antialiased",
-          geistMono.variable,
-          "font-sans",
-          geist.variable
-        )}
-      >
-        <body>
-          <ConvexClientProvider>
-            <ThemeProvider>{children}</ThemeProvider>
-          </ConvexClientProvider>
-        </body>
-      </html>
-    </ConvexAuthNextjsServerProvider>
+    <html
+      lang="fi"
+      suppressHydrationWarning
+      className={cn(
+        "antialiased",
+        geistMono.variable,
+        "font-sans",
+        geist.variable
+      )}
+    >
+      <body>
+        <Suspense fallback={null}>
+          <ConvexAuthNextjsServerProvider>
+            <ConvexClientProvider>
+              <ThemeProvider>{children}</ThemeProvider>
+            </ConvexClientProvider>
+          </ConvexAuthNextjsServerProvider>
+        </Suspense>
+      </body>
+    </html>
   )
 }

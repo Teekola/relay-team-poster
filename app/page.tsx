@@ -1,9 +1,13 @@
+import { cacheLife, cacheTag } from "next/cache"
 import Link from "next/link"
 import { ModeToggle } from "@/components/mode-toggle"
 import { Button } from "@/components/ui/button"
 import { fi } from "@/messages/fi"
 
-export default function Home() {
+export default async function Home() {
+  "use cache"
+  cacheTag("landing-shell")
+  cacheLife("max")
   return (
     <div className="flex min-h-svh flex-col">
       <header className="container mx-auto flex h-14 items-center px-3 sm:px-6">

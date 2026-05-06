@@ -5,6 +5,7 @@ import {
   UserGroupIcon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
+import { cacheLife, cacheTag } from "next/cache"
 import Link from "next/link"
 import { buttonVariants } from "@/components/ui/button"
 import {
@@ -37,7 +38,10 @@ const SECTIONS = [
   },
 ] as const
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  "use cache"
+  cacheTag("dashboard-shell")
+  cacheLife("max")
   return (
     <div className="flex flex-col gap-8">
       <h1 className="font-medium text-2xl">{fi.dashboard.title}</h1>
