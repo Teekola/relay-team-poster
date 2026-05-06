@@ -42,6 +42,8 @@ function TeamImageStageInner({
   const { canvas } = layout
   const scale = displayWidth / canvas.w
 
+  const pixelRatio = scale
+
   // Outer dimensions live in the wrapper component (team-image-stage.tsx) so
   // the page can render a same-size placeholder during the dynamic chunk
   // load — preventing layout shift when the Konva stage finally mounts.
@@ -54,7 +56,12 @@ function TeamImageStageInner({
         transformOrigin: "top left",
       }}
     >
-      <Stage ref={stageRef} width={canvas.w} height={canvas.h}>
+      <Stage
+        ref={stageRef}
+        width={canvas.w}
+        height={canvas.h}
+        pixelRatio={pixelRatio}
+      >
         <Layer listening={false}>
           <BackgroundLayer
             url={backgroundUrl}

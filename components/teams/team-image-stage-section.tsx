@@ -42,7 +42,8 @@ export function TeamImageStageSection({
     if (!templateId || !templates) return null
     return templates.find((t) => t._id === templateId) ?? null
   }, [templateId, templates])
-  const orderedAthletes = useOrderedAthletes(athleteOrder ?? [], athletes)
+  const debouncedAthleteOrder = useDebouncedValue(athleteOrder ?? [], 200)
+  const orderedAthletes = useOrderedAthletes(debouncedAthleteOrder, athletes)
   const debouncedTextValues = useDebouncedValue(textValues ?? {}, 200)
 
   if (!layout) {
