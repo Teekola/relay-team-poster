@@ -105,7 +105,7 @@ export function Combobox<TValue extends string = string>({
               event.stopPropagation()
               onChange(null)
             }}
-            className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-3xl text-muted-foreground hover:text-foreground"
+            className="absolute inset-y-0 right-0 flex w-9 items-center justify-center rounded-r-3xl text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:bg-muted focus-visible:text-foreground focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:ring-inset"
           >
             <HugeiconsIcon
               icon={Cancel01Icon}
