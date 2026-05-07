@@ -17,9 +17,11 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         const flow = String(params.flow ?? "")
 
         if (flow === "signUp" && !ALLOWED_EMAILS.includes(email)) {
-          throw new ConvexError(
-            "Rekisteröityminen on rajoitettu. Pyydä ylläpitäjältä pääsyä."
-          )
+          throw new ConvexError({
+            kind: "notAllowlisted",
+            message:
+              "Tämä sähköposti ei ole kutsulistalla. Pyydä ylläpitäjältä pääsyä.",
+          })
         }
 
         const name = params.name ? String(params.name) : email.split("@")[0]

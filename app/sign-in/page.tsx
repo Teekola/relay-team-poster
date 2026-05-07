@@ -2,6 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { ConvexError } from "convex/values"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
@@ -51,11 +52,16 @@ export default function SignInPage() {
       formData.set("flow", mode)
       await signIn("password", formData)
     } catch (error) {
-      const message =
-        error instanceof Error && error.message.includes("Rekisteröityminen")
-          ? fi.signIn.errors.restricted
-          : fi.signIn.errors.generic
-      setErrorMessage(message)
+      const isRestricted =
+        (error instanceof ConvexError &&
+          typeof error.data === "object" &&
+          error.data !== null &&
+          "kind" in error.data &&
+          error.data.kind === "notAllowlisted") ||
+        (error instanceof Error && error.message.includes("kutsulistalla"))
+      setErrorMessage(
+        isRestricted ? fi.signIn.errors.restricted : fi.signIn.errors.generic
+      )
     } finally {
       setIsPending(false)
     }
@@ -65,8 +71,12 @@ export default function SignInPage() {
     <main className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>{fi.signIn.title}</CardTitle>
-          <CardDescription>{fi.signIn.subtitle}</CardDescription>
+          <CardTitle>
+            {mode === "signIn" ? fi.signIn.title : fi.signIn.signUpTitle}
+          </CardTitle>
+          {mode === "signUp" && (
+            <CardDescription>{fi.signIn.signUpSubtitle}</CardDescription>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-6">

@@ -48,18 +48,19 @@ export const fi = {
    },
    signIn: {
       title: "Kirjaudu sisään",
-      subtitle: "Käytä rekisteröitynyttä sähköpostia ja salasanaa.",
+      signUpTitle: "Luo tili",
+      signUpSubtitle: "Vain kutsutut käyttäjät voivat rekisteröityä.",
       emailLabel: "Sähköposti",
       passwordLabel: "Salasana",
       nameLabel: "Nimi",
       submitSignIn: "Kirjaudu sisään",
-      submitSignUp: "Rekisteröidy",
-      toggleToSignUp: "Eikö sinulla ole tiliä? Rekisteröidy",
+      submitSignUp: "Luo tili",
+      toggleToSignUp: "Saitko kutsun? Luo tili",
       toggleToSignIn: "Onko sinulla jo tili? Kirjaudu sisään",
       errors: {
          generic: "Kirjautuminen epäonnistui. Tarkista sähköposti ja salasana.",
          restricted:
-            "Rekisteröityminen on rajoitettu. Pyydä ylläpitäjältä pääsyä.",
+            "Tämä sähköposti ei ole kutsulistalla. Pyydä ylläpitäjältä pääsyä.",
          invalidEmail: "Anna kelvollinen sähköpostiosoite.",
          passwordTooShort: "Salasanan tulee olla vähintään 8 merkkiä.",
       },
