@@ -31,37 +31,53 @@ export const planSchema = z.object({
   inputOrder: z.array(z.string()),
 })
 
+// Groq's strict JSON Schema mode (structuredOutputs: true) requires every
+// property to appear in `required` and disallows `additionalProperties`,
+// so we cannot use `.optional()` or `z.record(...)`. Optional-in-spirit
+// fields are modelled with `.nullable()` instead, and dynamic-key
+// dictionaries become explicit objects.
 export const rawPlanSchema = z.object({
   confidentMatches: z
     .array(
       z.object({
-        inputName: z.string().nullable().optional(),
-        athleteId: z.string().nullable().optional(),
+        inputName: z.string().min(1),
+        athleteId: z.string().min(1),
       })
     )
-    .default([]),
+    .describe(
+      "Every athlete-name token from the paste that matches exactly one roster entry. inputName is the token from the paste; athleteId is the matching roster id. Never null fields."
+    ),
   ambiguousMatches: z
     .array(
       z.object({
-        inputName: z.string().nullable().optional(),
-        candidateAthleteIds: z.array(z.string()).default([]),
+        inputName: z.string().min(1),
+        candidateAthleteIds: z.array(z.string()),
       })
     )
-    .default([]),
+    .describe(
+      "Tokens that could match more than one roster entry. Prefer this over creating new athletes whenever any roster entry is a plausible match."
+    ),
   newAthletes: z
     .array(
       z.object({
-        name: z.string().nullable().optional(),
-        nickname: z.string().nullable().optional(),
-        gender: z.string().nullable().optional(),
+        name: z.string().min(1),
+        nickname: z.string().nullable(),
+        gender: z.string().nullable(),
       })
     )
-    .default([]),
-  layoutId: z.string().nullable().optional(),
-  textValues: z
-    .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
-    .default({}),
-  inputOrder: z.array(z.string()).default([]),
+    .describe(
+      "Tokens with no plausible roster match. Use only when no roster entry could plausibly be the runner."
+    ),
+  layoutId: z.string().nullable(),
+  textValues: z.object({
+    eventName: z.string().nullable(),
+    teamName: z.string().nullable(),
+  }),
+  inputOrder: z
+    .array(z.string())
+    .describe(
+      "Every athlete-name token from the paste, in running order. Never empty when the paste lists runners."
+    ),
 })
 
 export type Plan = z.infer<typeof planSchema>

@@ -125,6 +125,14 @@ ambiguousMatch, OR the name of a newAthlete. inputOrder may be shorter
 than the layout's leg count if the paste only listed some legs — that's
 fine, the form will leave later slots empty.
 
+If the paste obviously lists personal names (comma-separated tokens, or
+one name per line), every such token MUST end up in confidentMatches,
+ambiguousMatches, or newAthletes — never silently dropped into
+eventName/teamName. An empty inputOrder is wrong whenever the paste
+contains any names. Never emit a match entry with empty inputName or
+empty athleteId; if you cannot fill both, omit the entry and add the
+token to newAthletes instead.
+
 ## Text values
 
 Populate textValues with whatever event and team text you can extract:
