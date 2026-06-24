@@ -60,10 +60,9 @@ const CLARIFICATION_QUESTIONS: Record<ClarificationField, string> = {
    teamName: "Mikä on joukkueen nimi? (esim. Angelniemen Ankkuri 1)",
 };
 
-const PLANNER_MODEL =
-   "meta-llama/llama-4-scout-17b-16e-instruct" satisfies Parameters<
-      typeof groq
-   >[0];
+const PLANNER_MODEL = "openai/gpt-oss-120b" satisfies Parameters<
+   typeof groq
+>[0];
 
 function pickClarifications(
    plan: Plan,
